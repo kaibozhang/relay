@@ -8,13 +8,13 @@
 
 ### 打开，然后试三步
 
-Windows 程序：[Relay.exe](<../dist/windows/Relay.exe>)。当前路径已有较早发布产物，最终版将重新发布到同一路径；源码新增功能不能仅凭旧文件存在就视为已交付。自包含 .NET 发布包无需另装 .NET、浏览器宿主或 WebView；保留完整发布目录。未签名程序可能触发 SmartScreen，请先核实来源、遵循组织政策，不要关闭安全保护。
+Windows 程序：[Relay.exe](<../dist/windows/Relay.exe>)。解压完整发布包后运行，发布清单与验证报告记录对应的构建和哈希。自包含 .NET 发布包无需另装 .NET、浏览器宿主或 WebView；保留完整发布目录。未签名程序可能触发 SmartScreen，请先核实来源、遵循组织政策，不要关闭安全保护。
 
 下面只是“写报告时被打断”的抽象说明，不是预置用户数据。主窗口“如何让它顺手”打开帮助；阅读帮助不会捕捉或创建示例。
 
 1. **离开前留一个动作。** 点击“留下续做卡”或帮助中的“留自己的第一步”。写“核对报告第3页收入数据”，不要只写“继续做报告”；补一句刚做到哪里。用自己的内容填写。
 2. **带上资源引用，再确认保存。** 主动选取／拖入文件或文件夹，或添加网址；只保存路径／链接，不复制文件。剪贴板只有点击粘贴时才读取。看到保存成功确认后再离开。
-3. **回来在工作旁继续。** 选择续做卡，选择需要的资源，再打开续做条。“留个进展”可同时记录刚完成的一步和新的下一步，两者一次保存；写入失败保留草稿。
+3. **回来在工作旁继续。** 选择续做卡打开续做条；条上的“资源”可明确选择需要的文件或网址，不会自动打开。“留个进展”同时记录完成的一步和新的下一步，两者一次保存；进展和完成都不必唤起管理页，失败保留草稿。
 
 | 场景 | 默认入口 |
 | --- | --- |
@@ -74,9 +74,9 @@ Windows 程序：[Relay.exe](<../dist/windows/Relay.exe>)。当前路径已有�
 
 ## 验证状态与源码
 
-截至 15:33 的原生 UI Automation 复测 **18/18 通过**，包含实际 Ctrl+Enter 保存及 Ctrl+Alt+Space 捕捉；热键注册、占用、回滚与 `WM_HOTKEY` 分发也已验证。早期合成输入曾被拒绝或不投递，历史限制记录仍保留；本次通过不代表所有桌面环境都可靠。另有 **30/30 次确认保存后强制终止再启动通过**，这不是断电或操作系统重启测试。84 分钟耐久验证仍在运行，尚未宣称通过。
+截至 16:02 的原生 UI Automation 复测 **19/19 通过**，包含实际 Ctrl+Enter 保存及 Ctrl+Alt+Space 捕捉；热键注册、占用、回滚与 `WM_HOTKEY` 分发也已验证。早期合成输入曾被拒绝或不投递，历史限制记录仍保留；本次通过不代表所有桌面环境都可靠。另有 **30/30 次确认保存后强制终止再启动通过**，这不是断电或操作系统重启测试。持续耐久验证的实际时长、最终状态和原始报告另见原生验证记录，不将未完成测试算作通过。
 
-早期 `PrintWindow` 得到空白图，后改为显式启用、对应用自身 WPF 视觉树执行 `RenderTargetBitmap` 的诊断图；这是实际控件渲染，**不是桌面截图，也不证明窗口未被其他窗口遮挡**。当前结果、历史限制及运行中的耐久测试见[原生验证报告](<Relay-Verification.md>)；报告仍在更新，不代表最终验收完成。本指南不将旧版浏览器测试报告当作原生验证证据。
+早期 `PrintWindow` 得到空白图，后改为显式启用、对应用自身 WPF 视觉树执行 `RenderTargetBitmap` 的诊断图；这是实际控件渲染，**不是桌面截图，也不证明窗口未被其他窗口遮挡**。当前结果、历史限制及运行中的耐久测试见[原生验证报告](<Relay-Verification.md>)；请按报告中的构建哈希、完成状态与未验证项理解结果。本指南不将旧版浏览器测试报告当作原生验证证据。
 
 实现入口：[原生项目](<../native/Relay.Desktop/Relay.Desktop.csproj>)、[应用启动](<../native/Relay.Desktop/App.cs>)、[帮助](<../native/Relay.Desktop/HelpWindow.cs>)、[进展编辑](<../native/Relay.Desktop/ProgressWindow.cs>)、[资源选择](<../native/Relay.Desktop/ResourceResumeWindow.cs>)、[仓库保存](<../native/Relay.Core/VaultStore.cs>)、[专注保存](<../native/Relay.Desktop/Services/FocusSessionStore.cs>)、[旧版迁移](<../native/Relay.Desktop/Services/LegacyImporter.cs>)、[提醒策略](<../native/Relay.Desktop/Services/ResurfacePolicy.cs>)、[Windows 集成](<../native/Relay.Desktop/Services/WindowsIntegration.cs>)、[快捷方式](<../native/Relay.Desktop/Services/ShortcutIntegration.cs>)。
 

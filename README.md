@@ -10,7 +10,7 @@
 
 便携包里的标记启用 **Data 随程序目录保存**；更新程序时保留 Data。没有便携标记时默认保存到当前用户本地应用数据目录。不是浏览器缓存。
 
-> 发布与两小时耐久验证仍在进行，最终结果见 [原生验证报告](<docs/Relay-Verification.md>)。
+发布包与原始测试证据分别记录构建哈希；实际完成结果和未验证项见 [原生验证报告](<docs/Relay-Verification.md>)。
 
 ## 为什么还要留一个新工具
 
@@ -24,6 +24,10 @@
 4. 做完一小步，用同一个窗口记录进展、改好下一步；没有打卡、积分和催促。
 
 如果你原来的工具已让这个流程同样顺手，就不需要多维护一份。没有未经测量的效率优势承诺。完整取舍见 [开源对照与定位](<docs/research/windows-positioning.md>)。
+
+![真实原生捕捉窗口](<docs/native-preview/capture.png>)
+
+[工作台](<docs/native-preview/workspace.png>) · [工作旁的续做条](<docs/native-preview/strip.png>) · [图像来源说明](<docs/native-preview/README.md>)
 
 ## 做好的基础
 
@@ -47,6 +51,8 @@
 
 - [中文快速指南](<docs/Relay-Windows-Guide.md>)
 - [原生验证报告](<docs/Relay-Verification.md>)
+- [数据与隐私边界](<docs/Relay-Privacy.md>) · [已知限制](<docs/Relay-Known-Limits.md>)
+- [性能修复实测](<docs/Relay-Performance.md>) · [两小时工作记录](<docs/Relay-Worklog.md>)
 - [发布检查清单](<docs/RELEASE-CHECKLIST.md>)
 - [纯原生源码](<native/Relay.Desktop/Relay.Desktop.csproj>)
 - [磁盘核心](<native/Relay.Core/VaultStore.cs>)

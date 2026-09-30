@@ -94,7 +94,7 @@ public sealed class MainWindow : Window
     private void Render()
     {
         var focus=FocusedControlId();RenderNavigation();RenderList();RestoreControlFocus(focus);
-        _status.Text=_store.IsReadOnly?"只读恢复模式 · 先导出或选择新仓库":"已写入磁盘 · "+_store.DataPath;
+        _status.Text=_store.IsReadOnly?"只读恢复模式 · 先导出或选择新仓库":(_document.Revision==0?"本地仓库 · 保存第一张续页后写入 · ":"已写入磁盘 · ")+_store.DataPath;
     }
     private void RenderNavigation()
     {
