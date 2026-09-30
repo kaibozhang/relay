@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings><Nullable>enable</Nullable>
+    <AssemblyName>Relay</AssemblyName><RootNamespace>Relay.Desktop</RootNamespace>
+    <Version>2.0.0</Version><ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Relay.Core/Relay.Core.csproj" /></ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+.browser*/
+.tooling-*/
+scoped_dir*/
+*.tmp
+node_modules/
+**/bin/
+**/obj/
+dist/
+artifacts/
+*.zip
+**/.test-*/
+Data/
