@@ -50,7 +50,8 @@ public sealed class VaultStore
             RecoveryNotice = null;
             recoveredFromBackup = false;
             loadedMain = null;
-            loadedMain = Retry(() => ReadSnapshot(DataPath));
+            try { loadedMain = Retry(() => ReadSnapshot(DataPath)); }
+            catch (InvalidDataException ex) { RecoveryNotice = "数据文件无法安全加载，已禁止保存。" + ex.Message; throw; }
             loadedBackup = null;
             if (loadedMain.Document is { } main)
             {
@@ -58,7 +59,8 @@ public sealed class VaultStore
                 IsReadOnly = false;
                 return main;
             }
-            loadedBackup = Retry(() => ReadSnapshot(BackupPath));
+            try { loadedBackup = Retry(() => ReadSnapshot(BackupPath)); }
+            catch (InvalidDataException ex) { RecoveryNotice = "备份文件无法安全加载，已禁止保存。" + ex.Message; throw; }
             IsReadOnly = false;
             if (!loadedMain.Exists && !loadedBackup.Exists)
             {
@@ -71,11 +73,11 @@ public sealed class VaultStore
             {
                 if (entry.Item2.Exists && entry.Item2.Document is null)
                 {
-                    try { notices.Add($"Corrupt bytes preserved at {PreserveCorrupt(entry.Item1, entry.Item2)}."); }
+                    try { notices.Add($"损坏文件已原样保留至 {PreserveCorrupt(entry.Item1, entry.Item2)}。"); }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                     {
                         IsReadOnly = true;
-                        notices.Add($"Cannot preserve corrupt file; vault is read-only: {ex.Message}");
+                        notices.Add($"无法保留损坏文件，当前数据已设为只读：{ex.Message}");
                     }
                 }
             }
@@ -83,13 +85,13 @@ public sealed class VaultStore
             {
                 loadedRevision = backup.Revision;
                 recoveredFromBackup = true;
-                notices.Insert(0, "Recovered the last good backup. The main file has not been overwritten; review before saving.");
+                notices.Insert(0, "已载入最近一次有效备份。主文件尚未覆盖，请检查内容后再保存。");
                 RecoveryNotice = string.Join(" ", notices);
                 return backup;
             }
             IsReadOnly = true;
             loadedRevision = 0;
-            notices.Insert(0, "No valid vault or backup could be read. Showing an empty read-only document; original files are untouched.");
+            notices.Insert(0, "数据文件与备份均无法读取。当前显示空白只读文档，原文件未被修改。");
             RecoveryNotice = string.Join(" ", notices);
             return new VaultDocument();
         }
@@ -101,7 +103,7 @@ public sealed class VaultStore
         lock (Gate)
         {
             if (loadedMain is null) Load();
-            if (IsReadOnly) throw new InvalidOperationException("The vault is read-only because recovery failed. Original files will not be overwritten.");
+            if (IsReadOnly) throw new InvalidOperationException("数据恢复失败，当前为只读状态；不会覆盖原文件。");
             // Work on a detached copy so failed writes never advance caller metadata.
             var candidate = Clone(document);
             if (loadedRevision == long.MaxValue) throw new InvalidOperationException("The vault revision is exhausted.");
@@ -201,7 +203,7 @@ public sealed class VaultStore
             return result;
         }
         catch (Exception ex) when (ex is JsonException or DecoderFallbackException)
-        { throw new InvalidDataException("Vault JSON is invalid, incomplete, or uses an unsupported schema.", ex); }
+        { throw new InvalidDataException("数据文件格式无效、不完整或版本不受支持。", ex); }
     }
 
     private static void ValidateFields(VaultDocument document)
@@ -309,8 +311,10 @@ public sealed class VaultStore
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            // Check metadata before hashing or reading: even a sparse multi-GB input must fail fast.
+            if (stream.Length > MaxUtf8Bytes)
+                throw new InvalidDataException("数据文件超过 32 MiB 上限；未读取、复制或修改原文件。");
             var fingerprint = Convert.ToHexString(SHA256.HashData(stream));
-            if (stream.Length > MaxUtf8Bytes) return new(true, fingerprint, null, "Vault exceeds the 32 MiB UTF-8 limit.");
             stream.Position = 0;
             var bytes = new byte[checked((int)stream.Length)];
             stream.ReadExactly(bytes);
@@ -323,12 +327,14 @@ public sealed class VaultStore
     private static void RequireUnchanged(Snapshot expected, Snapshot actual)
     {
         if (expected.Exists != actual.Exists || expected.Fingerprint != actual.Fingerprint)
-            throw new InvalidOperationException("The vault changed on disk since Load. Reload and reconcile your changes before saving.");
+            throw new InvalidOperationException("磁盘数据已被修改。请重新载入并核对更改后再保存。");
     }
     private static string PreserveCorrupt(string path, Snapshot snapshot)
     {
         var copy = path + ".corrupt-" + DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssfffffffZ") + "-" + Guid.NewGuid().ToString("N");
         using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (source.Length > MaxUtf8Bytes)
+            throw new IOException("损坏文件已超过 32 MiB 上限；为保留原文件，已停止自动恢复。");
         if (Convert.ToHexString(SHA256.HashData(source)) != snapshot.Fingerprint)
             throw new IOException("Corrupt file changed during recovery. Reload before continuing.");
         source.Position = 0;

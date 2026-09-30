@@ -1,0 +1,18 @@
+Relay / 续页 Windows
+
+Application source in native/Relay.* is provided under the MIT License in LICENSE.
+No code from the surveyed productivity projects was copied into this application.
+Research citations document product comparisons, not inherited software components.
+
+The Windows self-contained distribution includes Microsoft .NET / Windows Desktop
+runtime components and their own licenses and third-party notices. Preserve the
+licenses/Microsoft.NETCore.App/<version>/LICENSE.TXT and THIRD-PARTY-NOTICES.TXT,
+and licenses/Microsoft.WindowsDesktop.App/<version>/LICENSE copied by our
+publish script from the exact runtime packs. The manifest records their versions.
+Windows OS libraries and document-opening applications are not bundled by Relay.
+No Chromium, WebView2, Electron, telemetry SDK or cloud client is required.
+
+The generated application icon is original simple geometric artwork included
+under the same application license. Source code contains no remote font/image
+assets. The app is unsigned; authenticity and enterprise-policy acceptance must
+be evaluated by the user. This notice does not replace runtime component terms.

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Relay.Desktop/Services/ResourceSafety.cs" Link="Services/ResourceSafety.cs" />
+    <Compile Include="../Relay.Desktop/Services/AtomicExport.cs" Link="Services/AtomicExport.cs" />
+  </ItemGroup>
+</Project>

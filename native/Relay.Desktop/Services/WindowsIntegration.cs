@@ -23,7 +23,11 @@ public sealed class WindowsIntegration : IDisposable
     private const int CaptureId = 0x5241;
     private const int ResumeId = 0x5242;
     private const int WmHotkey = 0x0312;
-    private const uint Modifiers = 0x0001 | 0x0002 | 0x4000; // Alt + Control + NoRepeat
+    private Hotkey _captureKey = new(0x4003, 0x20, "Ctrl+Alt+Space");
+    private Hotkey _resumeKey = new(0x4003, 0x52, "Ctrl+Alt+R");
+    private int _captureError, _resumeError;
+    private string? _hotkeyUpdateError;
+    private readonly record struct Hotkey(uint Modifiers, uint Key, string Text);
     private const string OwnerValue = "Relay.Owner";
     private const string ExecutableValue = "Relay.Executable";
     private const string VaultValue = "Relay.Vault";
@@ -65,7 +69,14 @@ public sealed class WindowsIntegration : IDisposable
     public bool HasTray => !_disposed && _tray is { Visible: true };
     public bool CaptureHotkeyRegistered { get; private set; }
     public bool ResumeHotkeyRegistered { get; private set; }
-    public string Status => !_initialized ? (_disposed ? "Windows 集成已关闭" : "Windows 集成尚未初始化") : string.Join("；", _status);
+    public string CaptureHotkeyText => _captureKey.Text;
+    public string ResumeHotkeyText => _resumeKey.Text;
+    public string Status => !_initialized ? (_disposed ? "Windows 集成已关闭" : "Windows 集成尚未初始化")
+        : string.Join("；", new[]
+        {
+            CaptureHotkeyRegistered ? CaptureHotkeyText + " 已启用" : $"{CaptureHotkeyText} 未注册（{_captureError}）",
+            ResumeHotkeyRegistered ? ResumeHotkeyText + " 已启用" : $"{ResumeHotkeyText} 未注册（{_resumeError}）"
+        }.Concat(_status).Concat(_hotkeyUpdateError is null ? Array.Empty<string>() : new[] { _hotkeyUpdateError }));
 
     public void Initialize()
     {
@@ -97,12 +108,94 @@ public sealed class WindowsIntegration : IDisposable
         _handle = new WindowInteropHelper(_window).EnsureHandle();
         _source = HwndSource.FromHwnd(_handle) ?? throw new InvalidOperationException("Window source is unavailable.");
         _source.AddHook(WindowHook);
-        CaptureHotkeyRegistered = RegisterHotKey(_handle, CaptureId, Modifiers, 0x20);
-        int captureError = CaptureHotkeyRegistered ? 0 : Marshal.GetLastWin32Error();
-        ResumeHotkeyRegistered = RegisterHotKey(_handle, ResumeId, Modifiers, 0x52);
-        int resumeError = ResumeHotkeyRegistered ? 0 : Marshal.GetLastWin32Error();
-        _status.Add(CaptureHotkeyRegistered ? "Ctrl+Alt+Space 已启用" : $"Ctrl+Alt+Space 注册失败（{captureError}）");
-        _status.Add(ResumeHotkeyRegistered ? "Ctrl+Alt+R 已启用" : $"Ctrl+Alt+R 注册失败（{resumeError}）");
+        RegisterCurrentHotkeys();
+    }
+
+    private void RegisterCurrentHotkeys()
+    {
+        CaptureHotkeyRegistered = RegisterHotKey(_handle, CaptureId, _captureKey.Modifiers, _captureKey.Key);
+        _captureError = CaptureHotkeyRegistered ? 0 : Marshal.GetLastWin32Error();
+        ResumeHotkeyRegistered = RegisterHotKey(_handle, ResumeId, _resumeKey.Modifiers, _resumeKey.Key);
+        _resumeError = ResumeHotkeyRegistered ? 0 : Marshal.GetLastWin32Error();
+    }
+
+    /// <summary>
+    /// UI-thread only. Before Initialize, validates/configures bindings without registering them.
+    /// After Initialize, returns true only if both requested bindings are registered. Failed changes
+    /// restore previous bindings where possible; current flags/status reveal any restoration failure.
+    /// </summary>
+    public bool UpdateHotkeys(string capture, string resume)
+    {
+        _window.Dispatcher.VerifyAccess();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!TryParseHotkey(capture, out Hotkey nextCapture) || !TryParseHotkey(resume, out Hotkey nextResume)
+            || nextCapture == nextResume)
+        {
+            _hotkeyUpdateError = "快捷键无效：使用不同的 Ctrl/Alt/Shift + A–Z 或 Space，且至少包含 Ctrl 或 Alt";
+            return false;
+        }
+        if (!_initialized)
+        {
+            _captureKey = nextCapture; _resumeKey = nextResume; _hotkeyUpdateError = null;
+            return true;
+        }
+        if (_handle == IntPtr.Zero || _source is null)
+        { _hotkeyUpdateError = "快捷键更新失败：窗口句柄不可用"; return false; }
+        if (_captureKey == nextCapture && _resumeKey == nextResume && CaptureHotkeyRegistered && ResumeHotkeyRegistered)
+        { _hotkeyUpdateError = null; return true; }
+        Hotkey previousCapture = _captureKey, previousResume = _resumeKey;
+        if (CaptureHotkeyRegistered) UnregisterHotKey(_handle, CaptureId);
+        if (ResumeHotkeyRegistered) UnregisterHotKey(_handle, ResumeId);
+        _captureKey = nextCapture; _resumeKey = nextResume;
+        RegisterCurrentHotkeys();
+        if (CaptureHotkeyRegistered && ResumeHotkeyRegistered)
+        {
+            _hotkeyUpdateError = null;
+            UpdateThumbDescriptions();
+            return true;
+        }
+        int captureFailure = _captureError, resumeFailure = _resumeError;
+        if (CaptureHotkeyRegistered) UnregisterHotKey(_handle, CaptureId);
+        if (ResumeHotkeyRegistered) UnregisterHotKey(_handle, ResumeId);
+        _captureKey = previousCapture; _resumeKey = previousResume;
+        RegisterCurrentHotkeys();
+        _hotkeyUpdateError = $"新快捷键注册失败（{captureFailure}/{resumeFailure}）；已尝试恢复原快捷键";
+        UpdateThumbDescriptions();
+        return false;
+    }
+
+    private static bool TryParseHotkey(string? text, out Hotkey hotkey)
+    {
+        hotkey = default;
+        if (string.IsNullOrWhiteSpace(text) || text.Length > 64) return false;
+        string[] parts = text.Split('+', StringSplitOptions.TrimEntries);
+        if (parts.Length < 2 || parts.Length > 4) return false;
+        uint modifiers = 0;
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            uint flag = parts[i].ToUpperInvariant() switch { "CTRL" => 2u, "ALT" => 1u, "SHIFT" => 4u, _ => 0u };
+            if (flag == 0 || (modifiers & flag) != 0) return false;
+            modifiers |= flag;
+        }
+        if ((modifiers & 3) == 0) return false;
+        string key = parts[^1].ToUpperInvariant();
+        uint virtualKey;
+        if (key == "SPACE") virtualKey = 0x20;
+        else if (key.Length == 1 && key[0] >= 'A' && key[0] <= 'Z') virtualKey = key[0];
+        else return false;
+        string normalized = ((modifiers & 2) != 0 ? "Ctrl+" : "") + ((modifiers & 1) != 0 ? "Alt+" : "")
+            + ((modifiers & 4) != 0 ? "Shift+" : "") + (key == "SPACE" ? "Space" : key);
+        hotkey = new Hotkey(modifiers | 0x4000, virtualKey, normalized);
+        return true;
+    }
+
+    private void UpdateThumbDescriptions()
+    {
+        if (_taskbar?.ThumbButtonInfos.Count >= 2)
+        {
+            _taskbar.ThumbButtonInfos[0].Description = "捕捉续做卡 (" + CaptureHotkeyText + ")";
+            _taskbar.ThumbButtonInfos[1].Description = "继续上次工作 (" + ResumeHotkeyText + ")";
+        }
     }
 
     private IntPtr WindowHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -161,13 +254,13 @@ public sealed class WindowsIntegration : IDisposable
         _taskbar = new TaskbarItemInfo { Description = "续页 Relay" };
         var captureButton = new ThumbButtonInfo
         {
-            Description = "捕捉续做卡 (Ctrl+Alt+Space)",
+            Description = "捕捉续做卡 (" + CaptureHotkeyText + ")",
             ImageSource = DrawIcon("M 3,2 L 11,2 14,5 14,14 3,14 Z M 6,7 L 11,7 M 6,10 L 11,10", false)
         };
         captureButton.Click += CaptureThumbClick;
         var resumeButton = new ThumbButtonInfo
         {
-            Description = "继续上次工作 (Ctrl+Alt+R)",
+            Description = "继续上次工作 (" + ResumeHotkeyText + ")",
             ImageSource = DrawIcon("M 4,2 L 13,8 4,14 Z", true)
         };
         resumeButton.Click += ResumeThumbClick;

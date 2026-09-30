@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><Compile Include="../../../native/Relay.Desktop/Services/ShortcutIntegration.cs" Link="ShortcutIntegration.cs"/></ItemGroup></Project>

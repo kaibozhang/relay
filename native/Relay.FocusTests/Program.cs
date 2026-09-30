@@ -188,6 +188,30 @@ var tests = new List<(string Name, Action<string> Run)>
         store = Open(directory);
         Check(store.Current!.Paused && store.Warning is not null, "Valid live wins while invalid backup is reported.");
     }),
+    ("Oversized live and backup reject quickly without copies or mutation", directory =>
+    {
+        var store = Open(directory);
+        store.Start("card", 1, epoch);
+        var before = store.Current;
+        foreach (string path in new[] { Live(directory), Backup(directory) })
+        {
+            byte[] original = File.ReadAllBytes(path);
+            foreach (long size in new[] { 65537L, 1024L * 1024 * 1024 })
+            {
+                using (var large = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None))
+                    large.SetLength(size);
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                Throws<InvalidDataException>(store.Load);
+                Check(watch.Elapsed < TimeSpan.FromSeconds(1), "Oversized rejection must finish within one second.");
+                Throws<InvalidDataException>(() => store.Cancel());
+                Check(ReferenceEquals(before, store.Current), "Oversized input cannot change current state.");
+                Check(new FileInfo(path).Length == size, "Oversized original must remain untouched.");
+                Check(Directory.GetFiles(directory, "*.corrupt-*").Length == 0, "Oversized input must not be copied.");
+                Check(store.Warning is not null, "Oversized input is visible to parent.");
+                File.WriteAllBytes(path, original);
+            }
+        }
+    }),
     ("Read failure retains current state and does not erase bytes", directory =>
     {
         var store = Open(directory);
@@ -224,7 +248,6 @@ var invalidJson = new Dictionary<string, Func<JsonObject, string>>
     ["paused with deadline"] = obj => { obj["paused"] = true; return obj.ToJsonString(); },
     ["pending with remainder"] = obj => { obj["completionPending"] = true; return obj.ToJsonString(); },
     ["array root"] = _ => "[]",
-    ["oversized file"] = _ => new string(' ', 65536) + "null",
     ["trailing garbage"] = obj => obj.ToJsonString() + " garbage",
     ["trailing comma"] = obj => obj.ToJsonString()[..^1] + ",}",
     ["comment"] = obj => "/*no comments*/" + obj.ToJsonString()

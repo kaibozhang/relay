@@ -222,6 +222,7 @@ public sealed class CaptureWindow : Window
             try
             {
                 var path = ValidateLocalPath(raw);
+                if(!Relay.Desktop.Services.ResourceSafety.IsLocalNonRedirected(path,out var unsafeReason))throw new InvalidOperationException(unsafeReason);
                 if (_draft.Resources.Any(r => string.Equals(r.Target, path, StringComparison.OrdinalIgnoreCase))) continue;
                 var folder = Directory.Exists(path);
                 var label = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));

@@ -23,7 +23,8 @@ var tests = new (string Name, Action Body)[]
     ("Recovery rejects changed backup", RecoveryConcurrency),
     ("Failed reload cannot authorize overwrite", FailedReload),
     ("Export cannot overwrite live main or recovery files", ExportProtection),
-    ("Malformed Unicode is rejected without replacement", UnicodeValidation)
+    ("Malformed Unicode is rejected without replacement", UnicodeValidation),
+    ("Sparse 1 GiB input fails fast without copying", OversizedFailsFast)
 };
 var failed = 0;
 foreach (var test in tests)
@@ -215,6 +216,21 @@ static void UnicodeValidation() => WithVault((store, root) =>
     File.WriteAllText(path, Json(doc).Replace("sentinel", "\\uD800"));
     Throws<InvalidDataException>(() => store.Import(path));
     File.WriteAllBytes(path, [0xff, 0xfe, 0x7b, 0x7d]); Throws<InvalidDataException>(() => store.Import(path));
+});
+static void OversizedFailsFast() => WithVault((store, root) =>
+{
+    // SetLength only; no giant byte array or content writes.
+    using (var file = File.Create(store.DataPath)) file.SetLength(1024L * 1024 * 1024);
+    var timer = System.Diagnostics.Stopwatch.StartNew();
+    Throws<InvalidDataException>(() => store.Import(store.DataPath));
+    Throws<InvalidDataException>(() => store.Load());
+    timer.Stop();
+    Check(timer.Elapsed < TimeSpan.FromSeconds(1), $"Oversized rejection took {timer.Elapsed}");
+    Check(store.IsReadOnly && store.RecoveryNotice?.Contains("32 MiB") == true);
+    Throws<InvalidDataException>(() => store.Save(new VaultDocument()));
+    Check(new FileInfo(store.DataPath).Length == 1024L * 1024 * 1024);
+    Check(Directory.GetFiles(root).Length == 1, "Oversized file must not create copies or temporary files");
+    Console.WriteLine($"  1 GiB metadata-only rejection: {timer.Elapsed.TotalMilliseconds:F1} ms");
 });
 static void ByteLimit() => WithVault((store, root) =>
 {

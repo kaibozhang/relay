@@ -12,7 +12,14 @@ public static class ResourceSafety
         {
             if(string.IsNullOrWhiteSpace(target)||target.Length<3||!char.IsAsciiLetter(target[0])||target[1]!=':'||(target[2]!='\\'&&target[2]!='/')||target.StartsWith(@"\\")||target.IndexOf(':',2)>=0||target.Any(char.IsControl))
             {reason="不是受支持的本地绝对路径";return false;}
-            var full=Path.GetFullPath(target);var root=Path.GetPathRoot(full)!;var drive=new DriveInfo(root);
+            if(target.IndexOfAny(new[]{'*','?','"','<','>','|'})>=0){reason="路径包含不支持的字符";return false;}
+            var full=Path.GetFullPath(target);var root=Path.GetPathRoot(full)!;
+            foreach(var part in full[root.Length..].Split(new[]{'\\','/'},StringSplitOptions.RemoveEmptyEntries))
+            {
+                var stem=part.Split('.')[0].TrimEnd(' ','.').ToUpperInvariant();
+                if(part.EndsWith(' ')||part.EndsWith('.')||stem is "CON" or "PRN" or "AUX" or "NUL" or "CONIN$" or "CONOUT$" or "CLOCK$"||(stem.Length==4&&(stem.StartsWith("COM")||stem.StartsWith("LPT"))&&"0123456789¹²³".Contains(stem[3]))){reason="Windows 设备名称或含糊路径不受支持";return false;}
+            }
+            var drive=new DriveInfo(root);
             if(drive.DriveType!=DriveType.Fixed&&drive.DriveType!=DriveType.Removable){reason="网络或未验证磁盘：不会自动访问";return false;}
             var parts=full[root.Length..].Split(Path.DirectorySeparatorChar,StringSplitOptions.RemoveEmptyEntries);var current=root;
             if((File.GetAttributes(root)&FileAttributes.ReparsePoint)!=0){reason="重定向根目录：不会自动访问";return false;}

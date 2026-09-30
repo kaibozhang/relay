@@ -71,15 +71,15 @@ public sealed class FocusSessionStore
             PreserveInvalid(_backupPath, backup);
             FocusSession? loaded = live.Valid ? live.Session : backup.Valid ? backup.Session : null;
             if (!live.Valid && backup.Valid)
-                AddWarning("Focus timeline recovered from focus.json.bak; review the restored session.");
+                AddWarning("已从 focus.json.bak 恢复专注计时，请核对恢复的任务。");
             else if (!live.Valid && !backup.Valid && (live.Exists || backup.Exists))
-                AddWarning("No valid focus timeline could be recovered. Corrupt files were preserved.");
+                AddWarning("无法恢复有效的专注计时，损坏文件已保留。");
             Current = loaded;
             _loaded = true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            AddWarning("Cannot load focus timeline: " + ex.Message);
+            AddWarning("无法读取专注计时：" + ex.Message);
             throw;
         }
     }
@@ -191,9 +191,9 @@ public sealed class FocusSessionStore
             AtomicWrite(_path, bytes);
             Current = next;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            AddWarning("Cannot save focus timeline; the in-memory session is unchanged: " + ex.Message);
+            AddWarning("无法保存专注计时，当前计时状态未改变：" + ex.Message);
             throw;
         }
     }
@@ -222,23 +222,34 @@ public sealed class FocusSessionStore
 
     private sealed record ReadResult(bool Exists, bool Valid, FocusSession? Session, string? Error);
 
+    private static byte[] ReadBoundedBytes(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length > MaxFileBytes)
+            throw new InvalidDataException("专注计时文件超过 64 KiB，已停止读取并原样保留：" + Path.GetFileName(path));
+        byte[] bytes = new byte[MaxFileBytes + 1];
+        int count = 0;
+        while (count < bytes.Length)
+        {
+            int read = stream.Read(bytes, count, bytes.Length - count);
+            if (read == 0) break;
+            count += read;
+        }
+        if (count > MaxFileBytes)
+            throw new InvalidDataException("专注计时文件超过 64 KiB，已停止读取并原样保留：" + Path.GetFileName(path));
+        return bytes.AsSpan(0, count).ToArray();
+    }
+
     private static ReadResult ReadFile(string path)
     {
+        byte[] bytes;
+        // Size violations are fatal, not recoverable corruption: never copy an unbounded file.
+        try { bytes = ReadBoundedBytes(path); }
+        catch (FileNotFoundException) { return new(false, false, null, null); }
+        catch (DirectoryNotFoundException) { return new(false, false, null, null); }
         try
         {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (stream.Length > MaxFileBytes) return new(true, false, null, "file exceeds 64 KiB");
-            // Bounded allocation even if an external writer grows the file after the length check.
-            byte[] bytes = new byte[MaxFileBytes + 1];
-            int count = 0;
-            while (count < bytes.Length)
-            {
-                int read = stream.Read(bytes, count, bytes.Length - count);
-                if (read == 0) break;
-                count += read;
-            }
-            if (count > MaxFileBytes) return new(true, false, null, "file exceeds 64 KiB");
-            using var document = JsonDocument.Parse(bytes.AsMemory(0, count), new JsonDocumentOptions { MaxDepth = 4 });
+            using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 4 });
             JsonElement root = document.RootElement;
             if (root.ValueKind == JsonValueKind.Null) return new(true, true, null, null);
             if (root.ValueKind != JsonValueKind.Object) throw new JsonException("Expected a session object or null.");
@@ -253,8 +264,6 @@ public sealed class FocusSessionStore
             Validate(session);
             return new(true, true, session, null);
         }
-        catch (FileNotFoundException) { return new(false, false, null, null); }
-        catch (DirectoryNotFoundException) { return new(false, false, null, null); }
         catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidDataException)
         {
             return new(true, false, null, ex.Message);
@@ -264,9 +273,15 @@ public sealed class FocusSessionStore
     private void PreserveInvalid(string path, ReadResult result)
     {
         if (!result.Exists || result.Valid) return;
+        // Recheck the bound during preservation too; an external writer may have grown it.
+        byte[] bytes = ReadBoundedBytes(path);
         string evidence = path + ".corrupt-" + DateTimeOffset.UtcNow.ToString("yyyyMMddTHHmmssfffffffZ") + "-" + Guid.NewGuid().ToString("N");
-        File.Copy(path, evidence, overwrite: false);
-        AddWarning("Invalid " + Path.GetFileName(path) + " (" + result.Error + "). Original bytes preserved as " + Path.GetFileName(evidence) + ".");
+        using (var stream = new FileStream(evidence, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+        {
+            stream.Write(bytes);
+            stream.Flush(flushToDisk: true);
+        }
+        AddWarning(Path.GetFileName(path) + " 无效（" + result.Error + "），原始数据已保留为 " + Path.GetFileName(evidence) + "。");
     }
 
     private void AddWarning(string message) => Warning = Warning is null ? message : Warning + Environment.NewLine + message;
