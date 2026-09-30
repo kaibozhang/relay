@@ -16,7 +16,10 @@
   "portableAcceptance": "artifacts/package-tests/4268ef6fe92044989858276d8eabeb29/report.json",
   "releaseUiAcceptance": "artifacts/native-tests/20260930-082629-cb49ee26/report.json",
   "idleReport": "artifacts/idle-test/4a218e5be60f4b60b260f1182d94fbca/report.json",
-  "enduranceStatus": "running",
+  "enduranceStatus": "passed",
+  "enduranceElapsedSeconds": 5049.4124972,
+  "enduranceActions": 5650,
+  "enduranceSaveLoadComparisons": 6407,
   "enduranceRun": "artifacts/soak/20260930T073739728Z-1f4b84946d904201b390d65374ed9fd7",
   "knownLimits": [
     "Android deferred",
