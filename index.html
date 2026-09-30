@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173c32">
+  <meta name="description" content="留白，一个只属于你的本地工作台。收集想法，连接知识，把时间留给重要的事。">
+  <title>留白 · Lumen — 让想法有处安放</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="core.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#view">跳到主要内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="主导航">
+      <a class="brand" href="#home" aria-label="留白，回到今日">
+        <span class="brand-mark" aria-hidden="true">✳</span>
+        <span><span class="brand-word">留白</span><span class="brand-en">LUMEN / PERSONAL SPACE</span></span>
+      </a>
+      <div class="nav-group"><p class="nav-label">你的空间 / SPACE</p><nav id="main-nav"></nav></div>
+      <div class="sidebar-quote"><span class="quote-mark">“</span><p>不必填满每一刻。<br>给重要的事，<br>留一点空间。</p><span class="quote-line"></span></div>
+      <div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-view="settings" id="settings-nav"></button><div class="storage-indicator"><span class="dot"></span><span id="storage-status">本地空间 · 无需联网</span></div><span class="sidebar-version">MADE FOR YOUR EVERYDAY · V1.0</span></div>
+    </aside>
+    <button class="sidebar-scrim" id="sidebar-scrim" hidden aria-label="关闭导航"></button>
+    <main class="main-area">
+      <header class="topbar"><div class="breadcrumb"><button class="button ghost icon-button mobile-toggle" id="mobile-toggle" aria-label="打开导航" aria-expanded="false">☰</button><span class="breadcrumb-root">我的空间</span><span class="breadcrumb-separator">/</span><span id="breadcrumb-current">今日</span></div><div class="topbar-actions"><span id="header-date" class="topbar-date"></span><button class="button ghost search-trigger" data-action="command"><span aria-hidden="true">⌕</span> 搜索与跳转 <kbd class="kbd">Ctrl K</kbd></button><span class="avatar" aria-label="你的私人空间">我</span></div></header>
+      <div id="storage-warning" class="notice warning storage-banner" role="alert" hidden></div>
+      <div class="view-container" id="view" tabindex="-1"></div>
+      <footer class="page-footer"><span>留白 LUMEN</span><span>慢一点，也是在向前。</span><button class="button ghost small" data-action="export">备份你的空间 ↗</button></footer>
+    </main>
+  </div>
+  <dialog class="modal command-modal" id="command-dialog" aria-label="搜索与跳转"><div class="command-search"><input class="command-input" id="command-input" placeholder="搜索笔记、任务，或跳转页面…" aria-label="搜索内容" autocomplete="off"><button class="button ghost small" data-action="close-dialog">Esc</button></div><div class="command-results" id="command-results"></div><div class="command-hint">↑ ↓ 选择 · Enter 打开 · Esc 关闭</div></dialog>
+  <dialog class="modal" id="confirm-dialog" aria-labelledby="confirm-title"><div class="modal-header"><h2 id="confirm-title"></h2></div><div class="modal-body" id="confirm-message"></div><div class="modal-footer"><button class="button secondary" id="confirm-cancel">取消</button><button class="button primary" id="confirm-ok">确认</button></div></dialog>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <div id="toast-container" role="status" aria-live="polite"></div>
+  <noscript><p>留白需要启用 JavaScript。它完全在本地运行，不会上传你的内容。</p></noscript>
+</body>
+</html>

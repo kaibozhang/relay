@@ -1,0 +1,13 @@
+{
+  "name": "lumen-local-space",
+  "version": "1.0.0",
+  "private": true,
+  "description": "留白 — 零依赖、本地优先的个人工作台",
+  "scripts": {
+    "test": "node --test tests/core.test.cjs",
+    "test:browser": "node tests/browser-check.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
