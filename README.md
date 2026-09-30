@@ -6,7 +6,7 @@
 
 ## 直接运行
 
-打开 [Relay.exe](<dist/windows/Relay.exe>)。发布包是完整的自包含 Windows x64 文件夹，不需要浏览器、Node、.NET SDK、WebView2、账号或网络。
+双击工作区根目录的 [打开续页](<打开续页.lnk>)，或直接打开 [Relay.exe](<dist/windows/Relay.exe>)。根目录快捷方式绑定当前工作区路径；移动文件夹后请直接运行程序。发布包是完整的自包含 Windows x64 文件夹，不需要浏览器、Node、.NET SDK、WebView2、账号或网络。
 
 便携包里的标记启用 **Data 随程序目录保存**；更新程序时保留 Data。没有便携标记时默认保存到当前用户本地应用数据目录。不是浏览器缓存。
 

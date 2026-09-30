@@ -10,3 +10,4 @@ artifacts/
 *.zip
 **/.test-*/
 Data/
+*.lnk
