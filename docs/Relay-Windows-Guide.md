@@ -74,9 +74,9 @@ Windows 程序：[Relay.exe](<../dist/windows/Relay.exe>)。当前路径已有�
 
 ## 验证状态与源码
 
-本节是当前验证快照，最终发布前仍需核对：原生 UI Automation 基线 **12 项通过、2 项跳过**；质量回归中的 **30 次崩溃后重启通过**。热键注册及已注册入口的消息分发路径验证通过，但合成键盘辅助程序未能触发实际 `WM_HOTKEY` 投递，标记为 `environmentBlocked`；实体键盘尚未验证，不能据此前者宣称全局快捷键端到端通过。
+截至 15:33 的原生 UI Automation 复测 **18/18 通过**，包含实际 Ctrl+Enter 保存及 Ctrl+Alt+Space 捕捉；热键注册、占用、回滚与 `WM_HOTKEY` 分发也已验证。早期合成输入曾被拒绝或不投递，历史限制记录仍保留；本次通过不代表所有桌面环境都可靠。另有 **30/30 次确认保存后强制终止再启动通过**，这不是断电或操作系统重启测试。84 分钟耐久验证仍在运行，尚未宣称通过。
 
-早期 `PrintWindow` 得到空白图，后改为显式启用、对应用自身 WPF 视觉树执行 `RenderTargetBitmap` 的诊断图；这是实际控件渲染，**不是桌面截图，也不证明窗口未被其他窗口遮挡**。最终证据将汇总到[原生验证报告](<Relay-Verification.md>)（报告计划路径，待生成）；本指南不将旧版浏览器测试报告当作原生验证证据。
+早期 `PrintWindow` 得到空白图，后改为显式启用、对应用自身 WPF 视觉树执行 `RenderTargetBitmap` 的诊断图；这是实际控件渲染，**不是桌面截图，也不证明窗口未被其他窗口遮挡**。当前结果、历史限制及运行中的耐久测试见[原生验证报告](<Relay-Verification.md>)；报告仍在更新，不代表最终验收完成。本指南不将旧版浏览器测试报告当作原生验证证据。
 
 实现入口：[原生项目](<../native/Relay.Desktop/Relay.Desktop.csproj>)、[应用启动](<../native/Relay.Desktop/App.cs>)、[帮助](<../native/Relay.Desktop/HelpWindow.cs>)、[进展编辑](<../native/Relay.Desktop/ProgressWindow.cs>)、[资源选择](<../native/Relay.Desktop/ResourceResumeWindow.cs>)、[仓库保存](<../native/Relay.Core/VaultStore.cs>)、[专注保存](<../native/Relay.Desktop/Services/FocusSessionStore.cs>)、[旧版迁移](<../native/Relay.Desktop/Services/LegacyImporter.cs>)、[提醒策略](<../native/Relay.Desktop/Services/ResurfacePolicy.cs>)、[Windows 集成](<../native/Relay.Desktop/Services/WindowsIntegration.cs>)、[快捷方式](<../native/Relay.Desktop/Services/ShortcutIntegration.cs>)。
 

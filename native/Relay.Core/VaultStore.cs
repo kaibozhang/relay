@@ -283,24 +283,37 @@ public sealed class VaultStore
     private static void Id(string value, HashSet<string> ids, string field)
     {
         Text(value, 128, field, false);
-        Require(!string.IsNullOrWhiteSpace(value) && value == value.Trim() && ids.Add(value), $"{field} must be nonblank and globally unique.");
+        if (string.IsNullOrWhiteSpace(value) || value != value.Trim() || !ids.Add(value))
+            throw new InvalidDataException($"{field} must be nonblank and globally unique.");
     }
     private static void Text(string? value, int max, string field, bool multiline)
     {
-        Require(value is not null && value.Length <= max, $"{field} is required and may contain at most {max} UTF-16 characters.");
-        for (var i = 0; i < value!.Length; i++)
+        // Construct contextual messages only on failure: per-character interpolation creates
+        // hundreds of MiB of short-lived garbage when validating a large, valid vault.
+        if (value is null || value.Length > max)
+            throw new InvalidDataException($"{field} is required and may contain at most {max} UTF-16 characters.");
+        for (var i = 0; i < value.Length; i++)
         {
             var c = value[i];
-            Require(!(char.IsControl(c) && !(multiline && c is '\r' or '\n' or '\t')) &&
-                c is not '\u202A' and not '\u202B' and not '\u202C' and not '\u202D' and not '\u202E' and
-                not '\u2066' and not '\u2067' and not '\u2068' and not '\u2069', $"{field} contains a forbidden control character.");
+            if ((char.IsControl(c) && !(multiline && c is '\r' or '\n' or '\t')) ||
+                c is '\u202A' or '\u202B' or '\u202C' or '\u202D' or '\u202E' or
+                '\u2066' or '\u2067' or '\u2068' or '\u2069')
+                throw new InvalidDataException($"{field} contains a forbidden control character.");
             if (char.IsHighSurrogate(c))
-            { Require(i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]), $"{field} contains invalid Unicode."); i++; }
-            else Require(!char.IsLowSurrogate(c), $"{field} contains invalid Unicode.");
+            {
+                if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1]))
+                    throw new InvalidDataException($"{field} contains invalid Unicode.");
+                i++;
+            }
+            else if (char.IsLowSurrogate(c))
+                throw new InvalidDataException($"{field} contains invalid Unicode.");
         }
     }
-    private static void Date(DateTimeOffset value, string field) =>
-        Require(value.Year is >= 1970 and <= 9998, $"{field} must be between years 1970 and 9998.");
+    private static void Date(DateTimeOffset value, string field)
+    {
+        if (value.Year is < 1970 or > 9998)
+            throw new InvalidDataException($"{field} must be between years 1970 and 9998.");
+    }
     private static void OptionalDate(DateTimeOffset? value, string field) { if (value.HasValue) Date(value.Value, field); }
     private static void Require(bool condition, string message) { if (!condition) throw new InvalidDataException(message); }
 

@@ -73,7 +73,7 @@ public sealed class CaptureWindow : Window
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Grid.SetRow(scroll, 1); root.Children.Add(scroll);
         _title = RelayWindowUi.Input(_draft.Title ?? "", "capture.title", 200);
-        AddField(form, "标题", _title);
+        AddField(form, "标题（可选，留空会从下一步生成）", _title);
         _next = RelayWindowUi.Input(_draft.NextAction ?? "", "capture.next", 2000, true);
         _next.MinHeight = 66; _next.MaxHeight = 110;
         _next.FontSize = 17;
@@ -289,7 +289,9 @@ public sealed class CaptureWindow : Window
         prompt.PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) { prompt.Close(); e.Handled = true; }
-            else if (e.Key == Key.Enter) { Accept(); e.Handled = true; }
+            // Leave focused buttons (especially Cancel) to their native Enter behavior.
+            else if (e.Key == Key.Enter && input.IsKeyboardFocused && Keyboard.Modifiers == ModifierKeys.None)
+            { Accept(); e.Handled = true; }
         };
         prompt.Loaded += (_, _) => input.Focus();
         prompt.ShowDialog();
@@ -367,17 +369,17 @@ public sealed class CaptureWindow : Window
 // Shared only by the two small windows; no dependency on the main window's Ui helpers.
 internal static class RelayWindowUi
 {
-    internal static readonly Brush Ink = new SolidColorBrush(Color.FromRgb(35, 54, 47));
-    internal static readonly Brush Muted = new SolidColorBrush(Color.FromRgb(103, 112, 103));
-    internal static readonly Brush Paper = new SolidColorBrush(Color.FromRgb(244, 243, 236));
-    internal static readonly Brush Surface = new SolidColorBrush(Color.FromRgb(253, 252, 247));
-    internal static readonly Brush Green = new SolidColorBrush(Color.FromRgb(28, 65, 51));
-    internal static readonly Brush Line = new SolidColorBrush(Color.FromRgb(217, 222, 208));
-    internal static readonly Brush Error = new SolidColorBrush(Color.FromRgb(151, 63, 44));
+    internal static readonly Brush Ink = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(35, 54, 47));
+    internal static readonly Brush Muted = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(103, 112, 103));
+    internal static readonly Brush Paper = SystemParameters.HighContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromRgb(244, 243, 236));
+    internal static readonly Brush Surface = SystemParameters.HighContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromRgb(253, 252, 247));
+    internal static readonly Brush Green = SystemParameters.HighContrast ? SystemColors.HighlightBrush : new SolidColorBrush(Color.FromRgb(28, 65, 51));
+    internal static readonly Brush Line = SystemParameters.HighContrast ? SystemColors.ActiveBorderBrush : new SolidColorBrush(Color.FromRgb(217, 222, 208));
+    internal static readonly Brush Error = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(151, 63, 44));
     internal static readonly FontFamily BodyFont = new("Microsoft YaHei UI, Segoe UI");
     internal static readonly FontFamily DisplayFont = new("STZhongsong, SimSun, Georgia");
     internal static TextBlock Text(string text, double size = 14, Brush? color = null, bool bold = false) =>
-        new() { Text = text, FontSize = size, Foreground = color ?? Ink, TextWrapping = TextWrapping.Wrap,
+        new() { Text = text, FontSize = size, Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : color ?? Ink, TextWrapping = TextWrapping.Wrap,
             FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal };
     internal static TextBox Input(string text, string id, int maxLength, bool multiline = false)
     {
@@ -392,7 +394,7 @@ internal static class RelayWindowUi
     {
         var button = new Button { Content = label, Padding = new Thickness(12, 8, 12, 8),
             Margin = new Thickness(0, 0, 6, 0), Background = primary ? Green : Surface,
-            Foreground = primary ? Brushes.White : Ink, BorderBrush = primary ? Green : Line,
+            Foreground = primary ? (SystemParameters.HighContrast ? SystemColors.HighlightTextBrush : Brushes.White) : Ink, BorderBrush = primary ? Green : Line,
             BorderThickness = new Thickness(1), Cursor = Cursors.Hand, FontSize = 12,
             MinHeight = 30, VerticalContentAlignment = VerticalAlignment.Center };
         AutomationProperties.SetAutomationId(button, id);

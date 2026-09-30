@@ -31,6 +31,7 @@ public sealed class MainWindow : Window
     private WindowsIntegration? _integration;
     private CaptureWindow? _capture;
     private ProgressWindow? _progress;
+    private readonly List<string> _queuedResources=new();
     private ResumeStrip? _strip;
     private bool _quitting;
     private bool _trayHint;
@@ -70,7 +71,7 @@ public sealed class MainWindow : Window
     }
     private void BuildSidebar()
     {
-        var outer=new DockPanel{Background=new SolidColorBrush(Color.FromRgb(232,234,223)),LastChildFill=true};
+        var outer=new DockPanel{Background=SystemParameters.HighContrast?SystemColors.WindowBrush:new SolidColorBrush(Color.FromRgb(232,234,223)),LastChildFill=true};
         var brand=Ui.Stack(Ui.Text("↳  续页",29,Ui.Green,true),Ui.Text("RELAY / PICK UP WHERE YOU LEFT",8,Ui.Muted),new Border{Height=30},Ui.Text("不是更多待办，\n是少一点重新开始。",13,Ui.Muted));brand.Margin=new Thickness(23,30,18,24);DockPanel.SetDock(brand,Dock.Top);outer.Children.Add(brand);
         var bottom=Ui.Stack(Ui.Id(Ui.Button("空间与系统设置",ShowSettings),"main.settings"),Ui.Id(Ui.Button("如何让它顺手",()=>new HelpWindow(this,()=>Capture(),ShowSettings,_store.DirectoryPath).ShowDialog()),"main.help"),new Border{Height=12},Ui.Text(_document.Settings.CaptureHotkey+"\n随时留下一步",11,Ui.Muted),new Border{Height=12},Ui.Text("本机磁盘 · 无账号 · 不监控",10,Ui.Muted));bottom.Margin=new Thickness(18,15,10,24);DockPanel.SetDock(bottom,Dock.Bottom);outer.Children.Add(bottom);
         _navigation.Margin=new Thickness(12,0,12,0);outer.Children.Add(_navigation);Grid.SetColumn(outer,0);_root.Children.Add(outer);
@@ -80,7 +81,7 @@ public sealed class MainWindow : Window
         var dock=new DockPanel{LastChildFill=true,Margin=new Thickness(22,27,19,18)};
         var top=Ui.Stack(Ui.Text("把下一步，留给未来的自己。",15,Ui.Ink,true),new Border{Height=14});
         var capture=Ui.Id(Ui.Button("＋ 留下续做卡",()=>Capture(),true),"main.capture");capture.HorizontalAlignment=HorizontalAlignment.Stretch;capture.Margin=new Thickness(0,0,0,16);top.Children.Add(capture);
-        _search.ToolTip="搜索标题、下一步、上下文或资源名称 · Ctrl+F";top.Children.Add(_search);Ui.Gap(top,13);top.Children.Add(_count);Ui.Gap(top,12);DockPanel.SetDock(top,Dock.Top);dock.Children.Add(top);
+        System.Windows.Automation.AutomationProperties.SetName(_search,"搜索续页标题、下一步、上下文或资源");_search.ToolTip="搜索标题、下一步、上下文或资源名称 · Ctrl+F";top.Children.Add(_search);Ui.Gap(top,13);top.Children.Add(_count);Ui.Gap(top,12);DockPanel.SetDock(top,Dock.Top);dock.Children.Add(top);
         var scroll=new ScrollViewer{Content=_list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};dock.Children.Add(scroll);Grid.SetColumn(dock,1);_root.Children.Add(dock);
         var divider=new Border{Width=1,Background=Ui.Line,HorizontalAlignment=HorizontalAlignment.Right};Grid.SetColumn(divider,1);_root.Children.Add(divider);
     }
@@ -92,7 +93,7 @@ public sealed class MainWindow : Window
     }
     private void Render()
     {
-        RenderNavigation();RenderList();
+        var focus=FocusedControlId();RenderNavigation();RenderList();RestoreControlFocus(focus);
         _status.Text=_store.IsReadOnly?"只读恢复模式 · 先导出或选择新仓库":"已写入磁盘 · "+_store.DataPath;
     }
     private void RenderNavigation()
@@ -100,7 +101,7 @@ public sealed class MainWindow : Window
         _navigation.Children.Clear();
         foreach(var (key,label) in new[]{("ready","◉  回来继续"),("active","↗  正在进行"),("snoozed","◷  稍后回来"),("done","✓  已经完成"),("all","≡  全部续页")})
         {
-            var b=Ui.Id(Ui.Button(label,()=>{_filter=key;_selected=null;Render();}),"nav."+key);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new Thickness(0,0,0,7);b.BorderThickness=new Thickness(0);b.Background=_filter==key?Ui.Green:Brushes.Transparent;b.Foreground=_filter==key?Brushes.White:Ui.Ink;_navigation.Children.Add(b);
+            var b=Ui.Id(Ui.Button(label,()=>{_filter=key;_selected=null;Render();}),"nav."+key);b.HorizontalContentAlignment=HorizontalAlignment.Left;b.Margin=new Thickness(0,0,0,7);b.BorderThickness=new Thickness(0);b.Background=_filter==key?Ui.Green:Brushes.Transparent;b.Foreground=_filter==key?(SystemParameters.HighContrast?SystemColors.HighlightTextBrush:Brushes.White):Ui.Ink;_navigation.Children.Add(b);
         }
         Ui.Gap(_navigation,24);_navigation.Children.Add(Ui.Text("留下一句明确的下一步，\n比攒下一百条待办更有用。",11,Ui.Muted));
     }
@@ -113,22 +114,33 @@ public sealed class MainWindow : Window
     }
     private void RenderList()
     {
-        _list.Children.Clear();var cards=VisibleCards().ToList();_count.Text=cards.Count+" 张续页 · 不必一次做完";
+        var focus=FocusedControlId();_list.Children.Clear();var cards=VisibleCards().ToList();_count.Text=cards.Count+" 张续页 · 不必一次做完";
         if(_selected==null||!cards.Any(c=>c.Id==_selected))_selected=cards.FirstOrDefault()?.Id;
         foreach(var card in cards.Take(200))
         {
             var inner=Ui.Stack(Ui.Text((card.Pinned?"⌖ ":"")+card.Title,15,null,true),new Border{Height=8},Ui.Text(card.NextAction,12,Ui.Muted),new Border{Height=12});
             var meta=(card.Status=="active"?"正在继续":card.Status=="done"?"已完成":card.SnoozedUntil>DateTimeOffset.Now?"稍后 "+card.SnoozedUntil.Value.ToLocalTime().ToString("MM/dd HH:mm"):"等你回来");inner.Children.Add(Ui.Text(meta+"  ·  "+card.Resources.Count+" 个资源",10,card.Status=="active"?Ui.Accent:Ui.Muted));
-            var b=new Button{Content=inner,HorizontalContentAlignment=HorizontalAlignment.Stretch,Padding=new Thickness(16),Margin=new Thickness(0,0,0,10),Background=card.Id==_selected?new SolidColorBrush(Color.FromRgb(224,232,216)):Ui.Surface,BorderBrush=card.Id==_selected?Ui.Green:Ui.Line,BorderThickness=new Thickness(1),Cursor=Cursors.Hand};Ui.Id(b,"card."+card.Id);b.Click+=(_,_)=>{_selected=card.Id;RenderList();};_list.Children.Add(b);
+            var b=new Button{Content=inner,HorizontalContentAlignment=HorizontalAlignment.Stretch,Padding=new Thickness(16),Margin=new Thickness(0,0,0,10),Background=card.Id==_selected?(SystemParameters.HighContrast?SystemColors.WindowBrush:new SolidColorBrush(Color.FromRgb(224,232,216))):Ui.Surface,BorderBrush=card.Id==_selected?Ui.Green:Ui.Line,BorderThickness=new Thickness(1),Cursor=Cursors.Hand};Ui.Id(b,"card."+card.Id);b.Click+=(_,_)=>{_selected=card.Id;RenderList();};_list.Children.Add(b);
         }
         if(cards.Count>200)_list.Children.Add(Ui.Text("列表显示前 200 张，请搜索定位其他续页。",11,Ui.Muted));
         if(cards.Count==0)_list.Children.Add(Ui.Panel(Ui.Stack(Ui.Text("这里留着一点空白。",17,null,true),new Border{Height=10},Ui.Text(_search.Text.Length>0?"没有匹配的续页，试试更短的关键词。":"下一次被打断时，按快捷键留下一句话。回来后，不用重新猜。",12,Ui.Muted))));
-        RenderDetail();
+        RenderDetail();RestoreControlFocus(focus);
+    }
+    private string? FocusedControlId()
+    {
+        if(!IsActive||Keyboard.FocusedElement is not DependencyObject current||!IsAncestorOf(current))return null;
+        return System.Windows.Automation.AutomationProperties.GetAutomationId(current);
+    }
+    private void RestoreControlFocus(string? id)
+    {
+        if(string.IsNullOrEmpty(id)||!IsActive)return;
+        DependencyObject? Find(DependencyObject root){if(System.Windows.Automation.AutomationProperties.GetAutomationId(root)==id)return root;for(var i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var match=Find(VisualTreeHelper.GetChild(root,i));if(match!=null)return match;}return null;}
+        if(Find(_root) is FrameworkElement target&&target.IsEnabled&&target.Focusable)target.Focus();
     }
     private RelayCard? Selected=>_document.Cards.FirstOrDefault(c=>c.Id==_selected);
     private void RenderDetail()
     {
-        _detail.Children.Clear();_focusLabel=null;var card=Selected;
+        var focusId=FocusedControlId();_detail.Children.Clear();_focusLabel=null;var card=Selected;
         if(card==null){RenderWelcome();return;}
         _detail.Children.Add(Ui.Text("PICK UP WHERE YOU LEFT",10,Ui.Accent));Ui.Gap(_detail,9);
         _detail.Children.Add(Ui.Text(card.Title,28,Ui.Ink,true));Ui.Gap(_detail,7);
@@ -139,7 +151,7 @@ public sealed class MainWindow : Window
         }else{Ui.Gap(action,12);action.Children.Add(Ui.Text("这件事，已经告一段落。",12,Ui.Muted));}
         _detail.Children.Add(Ui.Panel(action));Ui.Gap(_detail,21);
         if(!string.IsNullOrWhiteSpace(card.Context)){_detail.Children.Add(Ui.Text("当时的思路",13,Ui.Ink,true));Ui.Gap(_detail,8);var context=Ui.Input(card.Context,true);context.IsReadOnly=true;context.MaxHeight=180;context.BorderThickness=new Thickness(0);context.Background=Brushes.Transparent;_detail.Children.Add(context);Ui.Gap(_detail,18);}
-        var resourcesHeader=new DockPanel();if(card.Resources.Count>0){var reopen=Ui.Id(Ui.Button("一起找回现场",()=>{var dialog=new ResourceResumeWindow(card,r=>ResourceLauncher.Open(r,this,confirm:false)){Owner=this};dialog.ShowDialog();}),"detail.resources");DockPanel.SetDock(reopen,Dock.Right);resourcesHeader.Children.Add(reopen);}resourcesHeader.Children.Add(Ui.Text("工作现场",13,Ui.Ink,true));_detail.Children.Add(resourcesHeader);Ui.Gap(_detail,7);
+        var resourcesHeader=new DockPanel();if(card.Resources.Count>0){var reopen=Ui.Id(Ui.Button("选择并打开资源",()=>{var dialog=new ResourceResumeWindow(card,r=>ResourceLauncher.Open(r,this,confirm:false)){Owner=this};dialog.ShowDialog();}),"detail.resources");DockPanel.SetDock(reopen,Dock.Right);resourcesHeader.Children.Add(reopen);}resourcesHeader.Children.Add(Ui.Text("工作现场",13,Ui.Ink,true));_detail.Children.Add(resourcesHeader);Ui.Gap(_detail,7);
         _detail.Children.Add(Ui.Text("只保存路径，不复制文件。点击后才会打开；不存在的资源会标记出来。",10,Ui.Muted));Ui.Gap(_detail,10);
         if(card.Resources.Count==0)_detail.Children.Add(Ui.Text("还没有附加资源。编辑续页可添加文件、文件夹或网址。",12,Ui.Muted));
         foreach(var resource in card.Resources)
@@ -160,7 +172,7 @@ public sealed class MainWindow : Window
         _detail.Children.Add(Ui.Text("留下的进展",13,Ui.Ink,true));Ui.Gap(_detail,9);
         if(card.Checkpoints.Count==0)_detail.Children.Add(Ui.Text("完成一小步后，留下一句。下一次回来，就少一次回忆。",12,Ui.Muted));
         foreach(var check in card.Checkpoints.OrderByDescending(c=>c.At).Take(20)){_detail.Children.Add(Ui.Text(check.At.ToLocalTime().ToString("MM/dd HH:mm"),10,Ui.Accent));_detail.Children.Add(Ui.Text(check.Text,13));Ui.Gap(_detail,12);}
-        Ui.Gap(_detail,20);var delete=Ui.Button("永久删除这张续页…",()=>Delete(card.Id));delete.Foreground=Ui.Muted;delete.BorderThickness=new Thickness(0);delete.Background=Brushes.Transparent;_detail.Children.Add(delete);
+        Ui.Gap(_detail,20);var delete=Ui.Button("永久删除这张续页…",()=>Delete(card.Id));delete.Foreground=Ui.Muted;delete.BorderThickness=new Thickness(0);delete.Background=Brushes.Transparent;_detail.Children.Add(delete);RestoreControlFocus(focusId);
     }
     private void RenderWelcome()
     {
@@ -174,10 +186,11 @@ public sealed class MainWindow : Window
     private bool Mutate(Action<VaultDocument> change,bool render=true)
     {
         try{if(_store.IsReadOnly)throw new InvalidOperationException("仓库处于只读恢复模式，请先导出并使用新的数据目录。");var candidate=VaultStore.Clone(_document);change(candidate);_store.Save(candidate);_document=candidate;if(render)Render();return true;}
-        catch(Exception error){MessageBox.Show(_capture is {IsVisible:true}?_capture:_progress is {IsVisible:true}?_progress:this,"修改未写入，原有数据仍保留。\n\n"+error.Message,"保存未完成",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}
+        catch(Exception error){MessageBox.Show(_capture is {IsVisible:true}?_capture:_progress is {IsVisible:true}?_progress:_strip is {IsVisible:true}?_strip:this,"修改未写入，原有数据仍保留。\n\n"+error.Message,"保存未完成",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}
     }
     public void Capture(IEnumerable<string>? resources=null,bool background=false)
     {
+        if(_progress is {IsVisible:true}){if(resources!=null)_queuedResources.AddRange(resources.Take(100-_queuedResources.Count));_progress.Activate();Notice("先完成当前进展；新的文件引用将在关闭后打开捕捉窗口。");return;}
         if(_capture!=null){if(resources!=null)_capture.AddResources(resources);_capture.Activate();return;}
         if(!background)ShowMain();_capture=new CaptureWindow(null,resources);
         if(!background&&IsVisible)_capture.Owner=this;else _capture.WindowStartupLocation=WindowStartupLocation.CenterScreen;
@@ -197,17 +210,19 @@ public sealed class MainWindow : Window
     }
     private void ShowStrip(RelayCard card)
     {
-        _strip?.Close();_strip=new ResumeStrip(card,ShowMain,()=>{ShowMain();Checkpoint(card.Id);},()=>{ShowMain();Complete(card.Id);});_strip.Closed+=(_,_)=>_strip=null;_strip.Topmost=_document.Settings.AlwaysOnTopStrip;_strip.Show();
+        _strip?.Close();_strip=new ResumeStrip(card,ShowMain,()=>Checkpoint(card.Id,_strip),()=>Complete(card.Id),()=>{var review=new ResourceResumeWindow(card,r=>ResourceLauncher.Open(r,(Window?)_strip??this,confirm:false)){Owner=(Window?)_strip??this};review.ShowDialog();});_strip.Closed+=(_,_)=>_strip=null;_strip.Topmost=_document.Settings.AlwaysOnTopStrip;_strip.Show();
     }
     public void ResumeLatest()
     {
+        if(_capture is {IsVisible:true}){_capture.Activate();return;}if(_progress is {IsVisible:true}){_progress.Activate();return;}
+        var blocking=OwnedWindows.Cast<Window>().FirstOrDefault(w=>w.IsVisible&&w!=_strip);if(blocking!=null){blocking.Activate();return;}
         ShowMain();var card=_document.Cards.Where(c=>c.Status!="done"&&(!c.SnoozedUntil.HasValue||c.SnoozedUntil<=DateTimeOffset.Now)).OrderByDescending(c=>c.Status=="active").ThenByDescending(c=>c.Pinned).ThenByDescending(c=>c.UpdatedAt).FirstOrDefault();if(card==null){Capture();return;}Resume(card.Id);
     }
-    private void Checkpoint(string id)
+    private void Checkpoint(string id,Window? owner=null)
     {
         if(_progress!=null){_progress.Activate();return;}var current=_document.Cards.FirstOrDefault(c=>c.Id==id);if(current==null)return;
-        var dialog=new ProgressWindow(this,"留个进展，让下一步更清楚",current.NextAction,(progress,next)=>Mutate(d=>{var c=d.Cards.First(c=>c.Id==id);c.Checkpoints.Add(new Checkpoint{At=DateTimeOffset.Now,Text=progress});c.NextAction=next;c.UpdatedAt=DateTimeOffset.Now;}));
-        _progress=dialog;try{if(dialog.ShowDialog()==true){if(_strip!=null&&Selected is {} updated)_strip.UpdateCard(updated);Notice("这一小步记下来了，续做条也已更新。");}}finally{_progress=null;}
+        var dialog=new ProgressWindow(owner??this,"留个进展，让下一步更清楚",current.NextAction,(progress,next)=>Mutate(d=>{var c=d.Cards.First(c=>c.Id==id);c.Checkpoints.Add(new Checkpoint{At=DateTimeOffset.Now,Text=progress});c.NextAction=next;c.UpdatedAt=DateTimeOffset.Now;}));
+        _progress=dialog;try{if(dialog.ShowDialog()==true){if(_strip!=null&&_document.Cards.FirstOrDefault(c=>c.Id==id) is {} updated)_strip.UpdateCard(updated);Notice("这一小步记下来了，续做条也已更新。");}}finally{_progress=null;if(_queuedResources.Count>0){var queued=_queuedResources.ToArray();_queuedResources.Clear();Dispatcher.BeginInvoke(new Action(()=>Capture(queued,true)));}}
     }
     private void Complete(string id)
     {
@@ -322,14 +337,14 @@ public sealed class MainWindow : Window
             catch(Exception error){MessageBox.Show(window,"未迁移，当前内容未改变。\n"+error.Message,"无法迁移",MessageBoxButton.OK,MessageBoxImage.Warning);}
         }),"settings.migrate"));Ui.Gap(stack,22);
         stack.Children.Add(Ui.Text("02 / Windows 入口",11,Ui.Accent));Ui.Gap(stack,8);var integrationText=Ui.Id(Ui.Text(_integration?.Status??"系统入口尚未初始化",12,Ui.Muted),"settings.integration");stack.Children.Add(integrationText);Ui.Gap(stack,10);
-        var captureKeys=Ui.Id(Ui.Input(_document.Settings.CaptureHotkey),"settings.captureHotkey");var resumeKeys=Ui.Id(Ui.Input(_document.Settings.ResumeHotkey),"settings.resumeHotkey");captureKeys.Width=210;resumeKeys.Width=210;captureKeys.HorizontalAlignment=resumeKeys.HorizontalAlignment=HorizontalAlignment.Left;
+        var captureKeys=Ui.Id(Ui.Input(_document.Settings.CaptureHotkey),"settings.captureHotkey");var resumeKeys=Ui.Id(Ui.Input(_document.Settings.ResumeHotkey),"settings.resumeHotkey");System.Windows.Automation.AutomationProperties.SetName(captureKeys,"全局捕捉快捷键");System.Windows.Automation.AutomationProperties.SetName(resumeKeys,"全局继续快捷键");captureKeys.Width=210;resumeKeys.Width=210;captureKeys.HorizontalAlignment=resumeKeys.HorizontalAlignment=HorizontalAlignment.Left;
         stack.Children.Add(Ui.Text("全局快捷键（Ctrl / Alt / Shift + 字母或 Space；不使用 Win 键）",11,Ui.Muted));Ui.Gap(stack,5);stack.Children.Add(captureKeys);Ui.Gap(stack,5);stack.Children.Add(resumeKeys);Ui.Gap(stack,7);
         stack.Children.Add(Ui.Id(Ui.Button("应用快捷键",()=>{if(_integration==null)return;var oldCapture=_integration.CaptureHotkeyText;var oldResume=_integration.ResumeHotkeyText;if(!_integration.UpdateHotkeys(captureKeys.Text,resumeKeys.Text)){integrationText.Text=_integration.Status;MessageBox.Show(window,"未能应用。请确认格式正确、两组不同，并且没有被其他应用占用。旧绑定已尝试恢复。","快捷键冲突");return;}if(!Mutate(d=>{d.Settings.CaptureHotkey=_integration.CaptureHotkeyText;d.Settings.ResumeHotkey=_integration.ResumeHotkeyText;}))_integration.UpdateHotkeys(oldCapture,oldResume);integrationText.Text=_integration.Status;}),"settings.applyHotkeys"));Ui.Gap(stack,14);
         var shell=new WrapPanel();shell.Children.Add(Ui.Id(Ui.Button("启用文件右键入口",()=>{try{WindowsIntegration.InstallExplorerMenu(Environment.ProcessPath??throw new InvalidOperationException("无法找到程序路径"),_store.DirectoryPath);MessageBox.Show(window,"已为当前用户添加“留到续页”。Windows 11 可能位于“显示更多选项”。\n移动程序后请先撤销再重新启用。","右键入口");}catch(Exception error){MessageBox.Show(window,error.Message,"未启用");}}),"settings.installShell"));shell.Children.Add(Ui.Id(Ui.Button("撤销右键入口",()=>{try{WindowsIntegration.RemoveExplorerMenu();MessageBox.Show(window,"续页拥有的右键入口已撤销。","右键入口");}catch(Exception error){MessageBox.Show(window,error.Message,"未撤销");}}),"settings.removeShell"));stack.Children.Add(shell);Ui.Gap(stack,10);
         var shortcuts=new WrapPanel();shortcuts.Children.Add(Ui.Id(Ui.Button("添加到开始菜单",()=>{try{var path=ShortcutIntegration.InstallStartMenu(Environment.ProcessPath!,_store.DirectoryPath);MessageBox.Show(window,"已创建快捷方式：\n"+path,"开始菜单");}catch(Exception error){MessageBox.Show(window,"未创建，系统权限可能限制了此位置。\n"+error.Message,"操作未完成");}}),"settings.startMenu"));shortcuts.Children.Add(Ui.Id(Ui.Button("启用右键“发送到”",()=>{try{var path=ShortcutIntegration.InstallSendTo(Environment.ProcessPath!,_store.DirectoryPath);MessageBox.Show(window,"已创建发送到入口：\n"+path,"发送到");}catch(Exception error){MessageBox.Show(window,"未创建，系统权限可能限制了此位置。\n"+error.Message,"操作未完成");}}),"settings.sendTo"));shortcuts.Children.Add(Ui.Id(Ui.Button("撤销快捷方式",()=>{try{ShortcutIntegration.RemoveSendTo();ShortcutIntegration.RemoveStartMenu();ShortcutIntegration.RemoveDesktop();MessageBox.Show(window,"本程序拥有的快捷方式已撤销；数据未删除。","续页");}catch(Exception error){MessageBox.Show(window,error.Message,"未完全撤销");}}),"settings.removeShortcuts"));stack.Children.Add(shortcuts);Ui.Gap(stack,15);
         var tray=new CheckBox{Content="关闭主窗口时留在托盘（用托盘“退出”完全结束）",IsChecked=_document.Settings.CloseToTray,Margin=new Thickness(0,0,0,10)};tray.Click+=(_,_)=>Mutate(d=>d.Settings.CloseToTray=tray.IsChecked==true);stack.Children.Add(tray);
         var top=new CheckBox{Content="续做条保持在其他窗口上方",IsChecked=_document.Settings.AlwaysOnTopStrip,Margin=new Thickness(0,0,0,10)};top.Click+=(_,_)=>{if(Mutate(d=>d.Settings.AlwaysOnTopStrip=top.IsChecked==true)&&_strip!=null)_strip.Topmost=top.IsChecked==true;};stack.Children.Add(top);
-        Ui.Gap(stack,15);stack.Children.Add(Ui.Text("03 / 自己的节奏",11,Ui.Accent));Ui.Gap(stack,8);var minutes=Ui.Input(_document.Settings.FocusMinutes.ToString());minutes.Width=80;minutes.HorizontalAlignment=HorizontalAlignment.Left;stack.Children.Add(Ui.Text("单次专注分钟（1–180）。暂停与计时状态写入磁盘，重启后继续；关闭期间不会弹通知。",11,Ui.Muted));Ui.Gap(stack,5);stack.Children.Add(minutes);Ui.Gap(stack,8);stack.Children.Add(Ui.Button("保存时长",()=>{if(!int.TryParse(minutes.Text,out var m)||m<1||m>180){MessageBox.Show(window,"请输入 1–180 的整数。");return;}Mutate(d=>d.Settings.FocusMinutes=m);}));Ui.Gap(stack,23);
+        Ui.Gap(stack,15);stack.Children.Add(Ui.Text("03 / 自己的节奏",11,Ui.Accent));Ui.Gap(stack,8);var minutes=Ui.Id(Ui.Input(_document.Settings.FocusMinutes.ToString()),"settings.focusMinutes");System.Windows.Automation.AutomationProperties.SetName(minutes,"单次专注分钟，1到180");minutes.Width=80;minutes.HorizontalAlignment=HorizontalAlignment.Left;stack.Children.Add(Ui.Text("单次专注分钟（1–180）。暂停与计时状态写入磁盘，重启后继续；关闭期间不会弹通知。",11,Ui.Muted));Ui.Gap(stack,5);stack.Children.Add(minutes);Ui.Gap(stack,8);stack.Children.Add(Ui.Button("保存时长",()=>{if(!int.TryParse(minutes.Text,out var m)||m<1||m>180){MessageBox.Show(window,"请输入 1–180 的整数。");return;}Mutate(d=>d.Settings.FocusMinutes=m);}));Ui.Gap(stack,23);
         stack.Children.Add(Ui.Text("边界与隐私",13,Ui.Ink,true));Ui.Gap(stack,5);stack.Children.Add(Ui.Text("不记录屏幕、键盘或剪贴板历史；只有你明确粘贴的内容才保存。不扫描文件。资源是路径引用，不恢复未保存的应用状态。没有云端与手机同步。系统通知可能受勿扰模式影响。",12,Ui.Muted));Ui.Gap(stack,16);stack.Children.Add(Ui.Id(Ui.Button("关闭设置",()=>window.Close()),"settings.close"));
         window.Content=new ScrollViewer{Content=new Border{Padding=new Thickness(28),Child=stack},VerticalScrollBarVisibility=ScrollBarVisibility.Auto};window.ShowDialog();
     }

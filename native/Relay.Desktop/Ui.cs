@@ -7,17 +7,17 @@ using System.Windows.Automation;
 namespace Relay.Desktop;
 public static class Ui
 {
-    public static readonly Brush Ink = new SolidColorBrush(Color.FromRgb(35,54,47));
-    public static readonly Brush Muted = new SolidColorBrush(Color.FromRgb(103,112,103));
-    public static readonly Brush Paper = new SolidColorBrush(Color.FromRgb(244,243,236));
-    public static readonly Brush Surface = new SolidColorBrush(Color.FromRgb(253,252,247));
-    public static readonly Brush Green = new SolidColorBrush(Color.FromRgb(28,65,51));
-    public static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(173,102,54));
-    public static readonly Brush Line = new SolidColorBrush(Color.FromRgb(217,222,208));
-    public static TextBlock Text(string text,double size=14,Brush? color=null,bool bold=false) => new TextBlock {Text=text,FontSize=size,Foreground=color??Ink,FontWeight=bold?FontWeights.SemiBold:FontWeights.Normal,TextWrapping=TextWrapping.Wrap,LineHeight=size*1.5};
+    public static readonly Brush Ink = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(35,54,47));
+    public static readonly Brush Muted = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(103,112,103));
+    public static readonly Brush Paper = SystemParameters.HighContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromRgb(244,243,236));
+    public static readonly Brush Surface = SystemParameters.HighContrast ? SystemColors.WindowBrush : new SolidColorBrush(Color.FromRgb(253,252,247));
+    public static readonly Brush Green = SystemParameters.HighContrast ? SystemColors.HighlightBrush : new SolidColorBrush(Color.FromRgb(28,65,51));
+    public static readonly Brush Accent = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : new SolidColorBrush(Color.FromRgb(150,81,34));
+    public static readonly Brush Line = SystemParameters.HighContrast ? SystemColors.ActiveBorderBrush : new SolidColorBrush(Color.FromRgb(217,222,208));
+    public static TextBlock Text(string text,double size=14,Brush? color=null,bool bold=false) => new TextBlock {Text=text,FontSize=size,Foreground=SystemParameters.HighContrast?SystemColors.WindowTextBrush:color??Ink,FontWeight=bold?FontWeights.SemiBold:FontWeights.Normal,TextWrapping=TextWrapping.Wrap,LineHeight=size*1.5};
     public static Button Button(string label,Action click,bool primary=false)
     {
-        var b=new Button{Content=label,Padding=new Thickness(15,9,15,9),Margin=new Thickness(0,0,8,0),MinHeight=36,Background=primary?Green:Surface,Foreground=primary?Brushes.White:Ink,BorderBrush=primary?Green:Line,BorderThickness=new Thickness(1),Cursor=System.Windows.Input.Cursors.Hand};
+        var b=new Button{Content=label,Padding=new Thickness(15,9,15,9),Margin=new Thickness(0,0,8,0),MinHeight=36,Background=primary?Green:Surface,Foreground=primary?(SystemParameters.HighContrast?SystemColors.HighlightTextBrush:Brushes.White):Ink,BorderBrush=primary?Green:Line,BorderThickness=new Thickness(1),Cursor=System.Windows.Input.Cursors.Hand};
         b.Click+=(_,_)=>click();return b;
     }
     public static TextBox Input(string text="",bool multiline=false)=>new TextBox{Text=text,Padding=new Thickness(10),Background=Surface,Foreground=Ink,BorderBrush=Line,BorderThickness=new Thickness(1),AcceptsReturn=multiline,TextWrapping=multiline?TextWrapping.Wrap:TextWrapping.NoWrap,VerticalScrollBarVisibility=multiline?ScrollBarVisibility.Auto:ScrollBarVisibility.Hidden,MinHeight=38,FontSize=14};

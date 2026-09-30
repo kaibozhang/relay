@@ -233,6 +233,33 @@ internal static class Program
                 Require(!Element(resources, "resources.openSelected").Current.IsEnabled, "Resource opener should initially require selection.");
                 Invoke(resources, "resources.cancel");
             });
+            Test("resume.checkpoint-and-complete-with-hidden-dashboard", () =>
+            {
+                Invoke(MainWindow(), "main.capture"); var capture = WindowWith("capture.title");
+                const string stripTitle = "Strip-only workflow card";
+                Set(capture, "capture.title", stripTitle); Set(capture, "capture.next", "Original strip next action");
+                Invoke(capture, "capture.save"); Await(() => FindCard(stripTitle) is not null && FindWindow("capture.title") is null, "strip fixture persisted");
+                var main = MainWindow(); Invoke(main, "detail.resume"); var strip = WindowWith("resume.collapse");
+                var mainPattern = (WindowPattern)main.GetCurrentPattern(WindowPattern.Pattern);
+                mainPattern.SetWindowVisualState(WindowVisualState.Minimized);
+                var mainHwnd = new IntPtr(main.Current.NativeWindowHandle);
+                // WPF UIA can report IsOffscreen=false for a minimized top-level HWND.
+                // Native IsIconic and WindowPattern state are authoritative for minimization.
+                void DashboardRemainsHidden() => Require(Native.IsIconic(mainHwnd) && mainPattern.Current.WindowVisualState == WindowVisualState.Minimized, "Strip action unexpectedly exposed the dashboard.");
+                Await(() => Native.IsIconic(mainHwnd) && mainPattern.Current.WindowVisualState == WindowVisualState.Minimized, "dashboard minimized for strip-only workflow");
+                Invoke(strip, "resume.checkpoint"); var progress = WindowWith("prompt.input");
+                DashboardRemainsHidden();
+                Set(progress, "prompt.input", "Strip-only checkpoint committed");
+                Set(progress, "prompt.next", "Updated from the strip without dashboard");
+                Invoke(progress, "prompt.confirm");
+                Await(() => FindWindow("prompt.input") is null && FindCard(stripTitle)?.GetProperty("nextAction").GetString() == "Updated from the strip without dashboard", "strip progress persisted");
+                Await(() => Element(strip, "resume.next").Current.Name == "Updated from the strip without dashboard", "strip text refreshed without dashboard");
+                Require(FindCard(stripTitle)?.GetProperty("checkpoints").EnumerateArray().Any(c => c.GetProperty("text").GetString() == "Strip-only checkpoint committed") == true, "Strip checkpoint missing on disk.");
+                DashboardRemainsHidden(); Screenshot(strip, "14-strip-only-progress");
+                Invoke(strip, "resume.complete");
+                Await(() => FindCard(stripTitle)?.GetProperty("status").GetString() == "done" && FindWindow("resume.collapse") is null, "strip-only completion persisted");
+                DashboardRemainsHidden(); mainPattern.SetWindowVisualState(WindowVisualState.Normal);
+            });
             Test("global-hotkey.ctrl-alt-space", () =>
             {
                 if (!_hotkeyAvailable) throw new SkipException("Ctrl+Alt+Space was occupied before this run; no input sent to another application's hotkey.");
@@ -601,6 +628,7 @@ internal static class Program
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool UnregisterHotKey(IntPtr hwnd, int id);
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetForegroundWindow(IntPtr hwnd);
         [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool IsIconic(IntPtr hwnd);
         [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr hwnd, out int pid);
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);

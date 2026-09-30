@@ -14,17 +14,18 @@ public sealed class ResumeStrip : Window
     private readonly TextBlock _title;
     private readonly TextBlock _next;
     private readonly TextBlock _feedback;
+    private readonly Button? _resourcesButton;
     private bool _positioned;
     public event Action? PauseRequested;
 
-    public ResumeStrip(RelayCard card, Action showMain, Action checkpoint, Action complete)
+    public ResumeStrip(RelayCard card, Action showMain, Action checkpoint, Action complete, Action? resources = null)
     {
         ArgumentNullException.ThrowIfNull(card);
         ArgumentNullException.ThrowIfNull(showMain);
         ArgumentNullException.ThrowIfNull(checkpoint);
         ArgumentNullException.ThrowIfNull(complete);
         Title = "续页 · 正在继续";
-        Width = 420; Height = 170; MinWidth = 360; MinHeight = 160;
+        Width = 460; Height = 180; MinWidth = 360; MinHeight = 160;
         ResizeMode = ResizeMode.NoResize;
         WindowStyle = WindowStyle.ToolWindow;
         ShowInTaskbar = false; Topmost = true;
@@ -69,8 +70,14 @@ public sealed class ResumeStrip : Window
         AutomationProperties.SetLiveSetting(_feedback, AutomationLiveSetting.Assertive);
         Grid.SetRow(_feedback, 2); root.Children.Add(_feedback);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 7, 0, 0) };
+        var buttons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 7, 0, 0) };
         buttons.Children.Add(RelayWindowUi.Button("展开", () => Invoke(showMain), "resume.expand"));
+        if (resources is not null)
+        {
+            _resourcesButton = RelayWindowUi.Button("资源", () => Invoke(resources), "resume.resources");
+            _resourcesButton.ToolTip = "选择需要恢复的资源，不会自动打开";
+            buttons.Children.Add(_resourcesButton);
+        }
         buttons.Children.Add(RelayWindowUi.Button("留个进展", () => Invoke(checkpoint), "resume.checkpoint"));
         buttons.Children.Add(RelayWindowUi.Button("完成", () => Invoke(complete), "resume.complete", true));
         var collapse = RelayWindowUi.Button("收起", Close, "resume.collapse");
@@ -103,6 +110,8 @@ public sealed class ResumeStrip : Window
         _title.ToolTip = _title.Text;
         _next.Text = string.IsNullOrWhiteSpace(card.NextAction) ? "展开续页，留下一步。" : card.NextAction;
         _next.ToolTip = _next.Text;
+        if (_resourcesButton is not null)
+            _resourcesButton.Visibility = card.Resources is { Count: > 0 } ? Visibility.Visible : Visibility.Collapsed;
         _feedback.Visibility = Visibility.Collapsed;
     }
 

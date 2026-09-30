@@ -58,6 +58,14 @@ try {
         $sourcePath = Assert-WorkspacePath (Join-Path $root $source)
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) { throw "Required release input missing: $source" }
     }
+    $existingManifestPath = Assert-WorkspacePath (Join-Path $output 'release-manifest.json')
+    if (Test-Path -LiteralPath $existingManifestPath -PathType Leaf) {
+        $existingManifest = Get-Content -LiteralPath $existingManifestPath -Raw | ConvertFrom-Json
+        if ($existingManifest.portable -isnot [bool]) { throw 'Existing release manifest has an invalid portable mode.' }
+        if ($existingManifest.portable -ne [bool]$Portable) {
+            throw 'Refusing to change the existing release data mode; use a separate clean workspace for a different mode.'
+        }
+    }
     if (-not $Portable -and (Test-Path -LiteralPath (Join-Path $output 'portable.txt'))) {
         throw 'Existing output is portable. Refusing to change its data mode; use a separate clean workspace for a desktop package.'
     }

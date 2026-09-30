@@ -1,0 +1,192 @@
+{
+  "generatedAt": "2026-09-30T06:46:16.482Z",
+  "browser": "Chrome headless, isolated local profile",
+  "url": "file:///D:/DPH/index.html",
+  "results": [
+    {
+      "name": "Initial dashboard and honest seed statistics",
+      "status": "PASS"
+    },
+    {
+      "name": "No horizontal desktop overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "Quick capture persists and reloads",
+      "status": "PASS"
+    },
+    {
+      "name": "Create edit and preview note safely",
+      "status": "PASS"
+    },
+    {
+      "name": "Trash and restore note",
+      "status": "PASS"
+    },
+    {
+      "name": "Task create complete and filter",
+      "status": "PASS"
+    },
+    {
+      "name": "Graph uses real linked notes",
+      "status": "PASS"
+    },
+    {
+      "name": "Focus pause resume stop and refresh",
+      "status": "PASS"
+    },
+    {
+      "name": "Command palette finds note and navigates",
+      "status": "PASS"
+    },
+    {
+      "name": "Settings and full JSON roundtrip",
+      "status": "PASS"
+    },
+    {
+      "name": "Chinese IME does not replace composing search input",
+      "status": "PASS"
+    },
+    {
+      "name": "Imported complex tags survive body-only edits",
+      "status": "PASS"
+    },
+    {
+      "name": "Expired timer records exactly once on reload",
+      "status": "PASS"
+    },
+    {
+      "name": "Already recorded timer is recovered without duplicate",
+      "status": "PASS"
+    },
+    {
+      "name": "Malformed storage is protected and export controls remain",
+      "status": "PASS"
+    },
+    {
+      "name": "Full note collection rejects add without corrupting backup",
+      "status": "PASS"
+    },
+    {
+      "name": "Timer completion preserves quick capture draft and caret",
+      "status": "PASS"
+    },
+    {
+      "name": "Command palette keyboard selection and native Tab target",
+      "status": "PASS"
+    },
+    {
+      "name": "Write failure remains exportable and visibly unsaved",
+      "status": "PASS"
+    },
+    {
+      "name": "Import validates rejects bad data then restores valid backup",
+      "status": "PASS"
+    },
+    {
+      "name": "Import refuses changed storage during confirmation",
+      "status": "PASS"
+    },
+    {
+      "name": "Storage conflict blocks silent overwrite",
+      "status": "PASS"
+    },
+    {
+      "name": "Responsive 390px layouts without overflow",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile drawer transfers focus and hides background",
+      "status": "PASS"
+    },
+    {
+      "name": "Application makes no network requests",
+      "status": "PASS"
+    },
+    {
+      "name": "No unhandled browser exceptions",
+      "status": "PASS"
+    }
+  ],
+  "exceptions": [],
+  "networkRequests": [
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNSIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSJXaW5kb3dUZXh0IiBkPSJNMjAgM2gtMVYxaC0ydjJIN1YxSDV2Mkg0Yy0xLjEgMC0yIC45LTIgMnYxNmMwIDEuMS45IDIgMiAyaDE2YzEuMSAwIDItLjkgMi0yVjVjMC0xLjEtLjktMi0yLTJ6bTAgMThINFY4aDE2djEzeiIvPjxwYXRoIGZpbGw9Im5vbmUiIGQ9Ik0wIDBoMjR2MjRIMHoiLz48L3N2Zz4=",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "file:///D:/DPH/index.html",
+    "file:///D:/DPH/styles.css",
+    "file:///D:/DPH/core.js",
+    "file:///D:/DPH/app.js",
+    "file:///D:/DPH/icon.svg",
+    "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNSIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBmaWxsPSJXaW5kb3dUZXh0IiBkPSJNMjAgM2gtMVYxaC0ydjJIN1YxSDV2Mkg0Yy0xLjEgMC0yIC45LTIgMnYxNmMwIDEuMS45IDIgMiAyaDE2YzEuMSAwIDItLjkgMi0yVjVjMC0xLjEtLjktMi0yLTJ6bTAgMThINFY4aDE2djEzeiIvPjxwYXRoIGZpbGw9Im5vbmUiIGQ9Ik0wIDBoMjR2MjRIMHoiLz48L3N2Zz4="
+  ]
+}
