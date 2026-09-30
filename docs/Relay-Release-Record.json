@@ -1,0 +1,30 @@
+{
+  "application": "Relay / 续页",
+  "version": "2.0.0",
+  "buildCommit": "5583d9c0f77ec7bc87db9cb7dda158a65b8381b2",
+  "platform": "Windows x64",
+  "ui": "WPF",
+  "selfContained": true,
+  "browserRuntimeRequired": false,
+  "portable": true,
+  "archive": "dist/Relay-Windows-x64.zip",
+  "sha256": "9717dac0efbbd2a0b5e5ff5c97e979c71b338b9dffd915d6a3a3f3e702c3ad9f",
+  "bytes": 76170849,
+  "signingStatus": "NotSigned",
+  "userDataIncluded": false,
+  "releaseValidation": "artifacts/release-test/20260930-162239-4acde83df2fa44ffb63e8b3387c44ee3/report.json",
+  "portableAcceptance": "artifacts/package-tests/4268ef6fe92044989858276d8eabeb29/report.json",
+  "releaseUiAcceptance": "artifacts/native-tests/20260930-082629-cb49ee26/report.json",
+  "idleReport": "artifacts/idle-test/4a218e5be60f4b60b260f1182d94fbca/report.json",
+  "enduranceStatus": "running",
+  "enduranceRun": "artifacts/soak/20260930T073739728Z-1f4b84946d904201b390d65374ed9fd7",
+  "knownLimits": [
+    "Android deferred",
+    "No cloud sync",
+    "Plaintext data",
+    "Real Explorer and SendTo registration blocked by host permissions",
+    "No clean VM test",
+    "No power loss test",
+    "High contrast/IME/screen readers not fully validated"
+  ]
+}

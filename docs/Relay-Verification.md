@@ -13,19 +13,31 @@
 | 打开资源决策 | 47通过/3跳过/0失败 | 50场景与72扩展名变体；不启动关联应用，不是安全沙箱 |
 | 旧版迁移 | 18/18 | 20MiB、Unicode、完整校验、长正文无损分片 |
 | 原生进程耐久 | 30/30 | 确认保存后强制终止再启动；不等价于断电或OS重启 |
-| 原生 UIA | 19/19 通过 | 最后16:02复测；真实快捷键、续做条更新/完成不拉起管理页、所有原生流程 |
+| 原生 UIA | 最终Release 19/19通过（16:27） | 对dist/windows/Relay.exe实际执行，真实快捷键与工作旁续做流程均通过 |
 | 原生模态草稿 | 6/6 通过 | 取消退出保留草稿、回调失败保留、陈旧编辑冲突、模态全局继续不改数据 |
 | 可访问性定向 | 最后10/10通过 | 真实WPF焦点/中文Name/URL取消Enter；一次未定位间歇搜索焦点失败保留，HC运行时未测 |
-| 便携实际流程 | 7/7 通过（15:34包） | 无参数便携保存、重启、Unicode仓库、SendTo参数、非法CLI，自包含CoreCLR |
-| 发布完整性 | 通过（待最后重打包） | 文件SHA256、PE x64、精确运行时许可、限制PATH/DOTNET_ROOT启动、Data不覆盖 |
+| 便携实际流程 | 最终包7/7通过（16:23） | 无参数便携保存、重启、Unicode仓库、SendTo参数、非法CLI，自包含CoreCLR |
+| 发布完整性 | 最终包通过（16:23） | 文件SHA256、PE x64、精确运行时许可、限制PATH/DOTNET_ROOT启动、Data不覆盖 |
+| 常驻空闲 | 12分钟完成 | CPU3.703秒，8核心归一平均0.0643%；私有内存末期66.4MiB，实际工作集247.3MiB |
 | 84分钟耐久 | 父会话托管运行中，尚未宣称通过 | 15:37:39开始，预计17:01:40结束；最初子任务的105分钟尝试在19.6秒后中断，未算通过 |
 
 ## 环境限制与证据
 
-- 热键注册、占用、回滚、WM_HOTKEY窗口分发已验证。合成SendInput早期被拒绝或不投递；最终16:02复测19/19通过，实际CtrlEnter与CtrlAltSpace均成功。历史失败与独立对照记录保留，不代表所有桌面环境都可靠。
+- 热键注册、占用、回滚、WM_HOTKEY窗口分发已验证。合成SendInput早期被拒绝或不投递；最终16:27针对Release程序复测19/19通过，实际CtrlEnter与CtrlAltSpace均成功。历史失败与独立对照记录保留，不代表所有桌面环境都可靠。
 - HKCU Explorer菜单和真实SendTo写入受宿主权限拒绝；工作区临时COM快捷方式创建/读取/更新/撤销通过。未提权或修改安全策略。入口是显式可选功能，不声称已安装。
 - 早期PrintWindow图片客户区空白，不能当视觉证据。后续明确诊断参数通过本应用WPF RenderTargetBitmap输出真实视觉树，不读取其他应用或桌面。每张记录来源和像素统计；模型不支持图像输入，不能声称人工逐像素审图。
 - 部分符号链接权限不可用；实际目录联接和硬链接测试已运行。没有连接网络共享。
+
+## 最终发布与原始证据
+
+最终ZIP SHA256：`9717dac0efbbd2a0b5e5ff5c97e979c71b338b9dffd915d6a3a3f3e702c3ad9f`。包内构建版本 `2.0.0+5583d9c`；后续文档提交不改变该二进制。
+
+- [最终发布验证](<../artifacts/release-test/20260930-162239-4acde83df2fa44ffb63e8b3387c44ee3/report.json>)
+- [最终便携CLI流程](<../artifacts/package-tests/4268ef6fe92044989858276d8eabeb29/report.json>)
+- [最终Release 19项原生UIA](<../artifacts/native-tests/20260930-082629-cb49ee26/report.json>)
+- [整套核心回归](<../artifacts/core-regression/20260930-155320-019d428a0afa49718b81e1abbe052dbb/report.json>)
+- [更新保留Data](<../artifacts/portable-update/a50f98e605704fe6b76ac1efe84e00f8/report.json>)
+- [常驻实测](<Relay-Idle-Footprint.md>) · [性能修复](<Relay-Performance.md>)
 
 ## 测试源码
 

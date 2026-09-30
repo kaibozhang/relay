@@ -27,6 +27,7 @@ internal static class Program
     private static Process? _app;
     private static int _failures;
     private static int _stressRestarts;
+    private static bool _release;
     private static bool _hotkeyAvailable;
     private const int HotkeyId = 0x6A51;
     private const int WaitMs = 10000;
@@ -37,8 +38,8 @@ internal static class Program
         try
         {
             _root = Workspace(args);
-            _exe = Path.Combine(_root, "native", "Relay.Desktop", "bin", "Debug", "net10.0-windows", "Relay.exe");
-            if (!File.Exists(_exe)) throw new FileNotFoundException("Build Relay.Desktop Debug before running the harness.", _exe);
+            _exe = _release ? Path.Combine(_root,"dist","windows","Relay.exe") : Path.Combine(_root, "native", "Relay.Desktop", "bin", "Debug", "net10.0-windows", "Relay.exe");
+            if (!File.Exists(_exe)) throw new FileNotFoundException("Build or publish the selected native Relay executable before testing.", _exe);
             var run = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")[..8];
             _output = Path.Combine(_root, "artifacts", "native-tests", run);
             _vault = Path.Combine(_root, "artifacts", "test-vault-" + Guid.NewGuid().ToString("N"));
@@ -375,8 +376,10 @@ internal static class Program
         {
             if (i + 1 >= args.Length) throw new ArgumentException("Missing option value.");
             if (args[i] == "--workspace") workspace = Path.GetFullPath(args[i + 1]);
+            else if (args[i] == "--configuration" && args[i+1] == "release") _release=true;
+            else if (args[i] == "--configuration" && args[i+1] == "debug") _release=false;
             else if (args[i] == "--stress-restarts" && int.TryParse(args[i + 1], out int count) && count is >= 0 and <= 100) _stressRestarts = count;
-            else throw new ArgumentException("Usage: Relay.Automation [--workspace <repository-root>] [--stress-restarts <0..100>]");
+            else throw new ArgumentException("Usage: Relay.Automation [--workspace <repository-root>] [--stress-restarts <0..100>] [--configuration <debug|release>]");
         }
         if (workspace is not null) return workspace;
         for (var d = new DirectoryInfo(Environment.CurrentDirectory); d is not null; d = d.Parent)

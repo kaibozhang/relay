@@ -11,7 +11,7 @@ dotnet build native/Relay.Desktop/Relay.Desktop.csproj -c Debug
 dotnet run --project native/Relay.Automation/Relay.Automation.csproj -c Debug -- --workspace D:\DPH
 ```
 
-Omit `--workspace` when running from the repository root or a descendant. Also accepts `--stress-restarts N` (0–100, default 0) to force-stop/restart the owned app N additional times and verify exact vault bytes plus completed-card UI. No arbitrary vault or executable argument is accepted. The harness always starts `native/Relay.Desktop/bin/Debug/net10.0-windows/Relay.exe`.
+Use `--configuration release` to test the fixed workspace `dist/windows/Relay.exe` instead of the Debug binary; arbitrary executable paths are not accepted. This mode still uses a dedicated explicit vault. Omit `--workspace` when running from the repository root or a descendant. Also accepts `--stress-restarts N` (0–100, default 0) to force-stop/restart the owned app N additional times and verify exact vault bytes plus completed-card UI. No arbitrary vault or executable argument is accepted. Without `--configuration release`, the harness starts `native/Relay.Desktop/bin/Debug/net10.0-windows/Relay.exe`.
 
 ## Safety and isolation
 
@@ -49,6 +49,8 @@ Reports and window PNGs are stored in `artifacts/native-tests/<UTC-run-id>/`. Th
 Final real UI run on 2026-09-30 completed **19/19 passed, 0 skipped, 0 failed** in 44.2 seconds, including checkpoint and completion entirely from the strip while the dashboard remained minimized. Both **actual SendInput Ctrl+Enter and Ctrl+Alt+Space passed**, alongside the separately labeled WM_HOTKEY handler and registration-conflict checks. First startup was 883 ms with 138,891,264 bytes working set. All 10 owned app processes exited. Evidence: `artifacts/native-tests/20260930-080200-ffa83880/report.json`. All 32 images in that report (16 PrintWindow and 16 explicitly labeled app-owned visual renders) had nonblank client pixel variation; the current native strip screenshot is 460×180. A separate earlier run completed **30/30 real forced-stop/restart durability trials** in 80.1 seconds.
 
 Earlier restricted-runtime runs had blocked foreground/input delivery and blank PrintWindow client areas. Those historical raw results remain unchanged; they do not describe the final passing baseline. Conditional environment diagnostics remain available if the same restrictions recur. Pixel checks establish nonblank captures, not model-based visual review or pixel-perfect UI correctness.
+
+A further run using `--configuration release` tested the exact published `dist/windows/Relay.exe` at 16:27 and also passed **19/19**, including both actual keyboard shortcuts and strip-only progress/completion. Evidence: `artifacts/native-tests/20260930-082629-cb49ee26/report.json`. This is separate from the Debug baseline above.
 
 ## Limitations
 
