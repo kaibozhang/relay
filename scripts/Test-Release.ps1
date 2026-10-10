@@ -34,7 +34,7 @@ function Assert-WorkspacePath([string]$Path) {
     return $full
 }
 function Test-Forbidden([string]$Name) {
-    return $Name -match '(?i)(^|/)(Data|[.]git|tests?|artifacts|diagnostics?|node_modules|localStorage)(/|$)' -or
+    return $Name -match '(?i)(^|/)(Data|drafts|[.]git|tests?|artifacts|diagnostics?|node_modules|localStorage)(/|$)' -or
         $Name -match '(?i)([.]pdb|[.]log|[.]dmp|[.]etl|[.]png|[.]jpe?g|[.]html?|[.]m?js|[.]css|[.]map)$' -or
         $Name -match '(?i)(^|/)(createdump[.]exe|vault[.]json.*|focus[.]json.*|[.]relay[.]lock|.*(?:testhost|WebView2|msedge|chromium|playwright).*)$'
 }

@@ -68,6 +68,8 @@ internal static class Program
     }
     private static void Exports()
     {
+        Add("Export cannot overwrite GUID draft filename", f => {var target=f.File(Guid.NewGuid().ToString("N")+".json");Reject(()=>AtomicExport.WriteText(target,"bad",f.Vault));Check(System.IO.File.ReadAllText(target)==Original,"Draft bytes changed");f.NoTemps();});
+        Add("Export cannot enter vault drafts subtree", f => {var directory=Path.Combine(f.Vault,"drafts");Directory.CreateDirectory(directory);var target=Path.Combine(directory,"ordinary.txt");Reject(()=>AtomicExport.WriteText(target,"bad",f.Vault));Check(!System.IO.File.Exists(target),"Created export in draft directory");f.NoTemps();});
         Add("Export Unicode exact UTF8 without BOM", f =>
         {
             var target = f.PathOf("导出 🧪.txt"); const string text = "中文 café 🧪\r\nsecond line\n";

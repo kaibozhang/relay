@@ -80,7 +80,7 @@ internal static class Program
             Run("Quit cancels capture discard and preserves main/draft", QuitCapture);
             Run("Quit cancels progress discard and preserves main/draft", QuitProgress);
             Run("Capture required next action, false/throw retention, successful retry", CaptureRetry);
-            Run("Progress required inputs, false/throw retention, successful retry", ProgressRetry);
+            Run("Progress optional checkpoint, no-change rejection, false/throw retention, successful retry", ProgressRetry);
             Run("ResumeLatest preserves dirty capture/progress without mutating document", ResumeLatestModalGuard);
             Run("Main.Edit rejects stale fingerprint and preserves new checkpoint", StaleEdit);
             Check(File.ReadAllBytes(_dataPath).SequenceEqual(_diskBefore), "Test callbacks must not change persisted seed vault");
@@ -266,34 +266,61 @@ internal static class Program
     }
     private static void ProgressRetry()
     {
-        var calls = 0;
-        var dialog = new ProgressWindow(_main, "Retry checkpoint", "", (progress, next) =>
+        foreach (var progressInput in new[] { "", "  ", "  Valid progress  " })
         {
-            calls++;
-            Check(progress == "Valid progress" && next == "Valid next", "Callback receives trimmed inputs");
-            return calls switch { 1 => false, 2 => throw new IOException("injected progress persistence failure"), _ => true };
-        });
-        var result = Modal(dialog, () =>
-        {
-            Call(dialog, "Save");
-            Check(calls == 0 && dialog.IsVisible, "Empty progress blocks save");
-            Text(dialog, "_progress").Text = "  Valid progress  ";
-            Text(dialog, "_next").Text = "  ";
-            Call(dialog, "Save");
-            Check(calls == 0 && dialog.IsVisible, "Required next action blocks save");
-            Check(Field<TextBlock>(dialog, "_error").Visibility == Visibility.Visible, "Validation is shown inline");
-            Text(dialog, "_next").Text = "  Valid next  ";
-            for (var attempt = 1; attempt <= 2; attempt++)
+            var calls = 0;
+            var dialog = new ProgressWindow(_main, "Retry checkpoint", "  Original next  ", (progress, next) =>
             {
+                calls++;
+                Check(progress == progressInput.Trim() && next == "Valid next", "Callback receives trimmed optional progress and next action");
+                return calls switch { 1 => false, 2 => throw new IOException("injected progress persistence failure"), _ => true };
+            });
+            var result = Modal(dialog, () =>
+            {
+                Check(Text(dialog, "_next").Text == "  Original next  ", "Next action starts from current value");
+                var form = (Panel)Text(dialog, "_next").Parent;
+                Check(form.Children.IndexOf(Text(dialog, "_next")) < form.Children.IndexOf(Text(dialog, "_progress")), "Next action precedes optional progress");
+                foreach (var unchangedNext in new[] { "  Original next  ", "Original next" })
+                {
+                    Text(dialog, "_next").Text = unchangedNext;
+                    Text(dialog, "_progress").Text = "  ";
+                    Call(dialog, "Save");
+                    Check(calls == 0 && dialog.IsVisible && !Field<bool>(dialog, "_saved"), "Blank progress and normalized unchanged next never report success or call save");
+                    Check(Field<TextBlock>(dialog, "_error").Visibility == Visibility.Visible &&
+                          Field<TextBlock>(dialog, "_error").Text == "下一步没有变化；修改后再保存，或关闭。", "No-change explanation is shown inline");
+                }
+                Text(dialog, "_progress").Text = progressInput;
+                Text(dialog, "_next").Text = "  ";
                 Call(dialog, "Save");
-                Check(calls == attempt && dialog.IsVisible && !Field<bool>(dialog, "_saved"), "Rejected progress save retains dialog");
-                Check(Text(dialog, "_progress").Text == "  Valid progress  " && Text(dialog, "_next").Text == "  Valid next  ", "Progress input survives failure");
-                Check(!Field<bool>(dialog, "_saving") && Field<Button>(dialog, "_confirm").IsEnabled, "Retry guard/button restored");
-            }
-            Check(Field<TextBlock>(dialog, "_error").Text.Contains("injected progress"), "Progress exception shown inline");
-            Call(dialog, "Save");
+                Check(calls == 0 && dialog.IsVisible, "Required next action blocks save even with optional progress");
+                Check(Field<TextBlock>(dialog, "_error").Visibility == Visibility.Visible &&
+                      Field<TextBlock>(dialog, "_error").Text == "请留下接下来的一个动作。", "Required-next validation is shown inline");
+                Text(dialog, "_next").Text = "  Valid next  ";
+                for (var attempt = 1; attempt <= 2; attempt++)
+                {
+                    Call(dialog, "Save");
+                    Check(calls == attempt && dialog.IsVisible && !Field<bool>(dialog, "_saved"), "Rejected progress save retains dialog");
+                    Check(Text(dialog, "_progress").Text == progressInput && Text(dialog, "_next").Text == "  Valid next  ", "Optional progress and next input survive failure exactly");
+                    Check(!Field<bool>(dialog, "_saving") && Field<Button>(dialog, "_confirm").IsEnabled, "Retry guard/button restored");
+                }
+                Check(Field<TextBlock>(dialog, "_error").Text.Contains("injected progress"), "Progress exception shown inline");
+                Call(dialog, "Save");
+            });
+            Check(result == true && !dialog.IsVisible && calls == 3, "Changed-next retry succeeds with blank or provided progress");
+        }
+        var checkpointCalls = 0;
+        var checkpointDialog = new ProgressWindow(_main, "Checkpoint only", "Original next", (progress, next) =>
+        {
+            checkpointCalls++;
+            Check(progress == "Valid progress" && next == "Original next", "Progress may be recorded without changing next action");
+            return true;
         });
-        Check(result == true && !dialog.IsVisible && calls == 3, "Progress retry succeeds exactly once");
+        var checkpointResult = Modal(checkpointDialog, () =>
+        {
+            Text(checkpointDialog, "_progress").Text = "  Valid progress  ";
+            Call(checkpointDialog, "Save");
+        });
+        Check(checkpointResult == true && checkpointCalls == 1, "Nonempty progress with unchanged next still saves");
     }
     private static void ResumeLatestModalGuard()
     {

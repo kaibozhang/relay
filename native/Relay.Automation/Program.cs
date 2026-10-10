@@ -310,6 +310,154 @@ internal static class Program
                 capture = WindowWith("capture.title"); AssertDashboardHidden(); Screenshot(capture, "10-warm-hidden-capture");
                 Invoke(capture, "capture.cancel"); Await(() => FindWindow("capture.title") is null, "warm capture cancelled");
             });
+            Test("resume.warm-secondary-keeps-dashboard-minimized", () => InScenarioVault("resume-warm", () =>
+            {
+                const string fixtureTitle = "Dedicated warm resume card";
+                CreateScenarioCard(fixtureTitle, "Resume without restoring the dashboard");
+                var main = MainWindow(); EnsureOwned(main);
+                var state = (WindowPattern)main.GetCurrentPattern(WindowPattern.Pattern);
+                var hwnd = new IntPtr(main.Current.NativeWindowHandle);
+                state.SetWindowVisualState(WindowVisualState.Minimized);
+                Await(() => Native.IsIconic(hwnd) && state.Current.WindowVisualState == WindowVisualState.Minimized, "warm resume dashboard minimized");
+                Forward("--resume");
+                var strip = WindowWith("resume.collapse");
+                RequireVisible(strip, "warm resume strip");
+                Require(Element(strip, "resume.next").Current.Name == "Resume without restoring the dashboard", "Warm resume selected the wrong card.");
+                Await(() => FindCard(fixtureTitle)?.GetProperty("status").GetString() == "active", "warm resume persisted active status");
+                Require(Native.IsIconic(hwnd) && state.Current.WindowVisualState == WindowVisualState.Minimized, "Secondary --resume restored the minimized dashboard.");
+                Require(FindWindow("capture.title") is null, "Eligible warm resume unexpectedly opened capture.");
+                Screenshot(strip, "15-warm-quiet-resume");
+                Invoke(strip, "resume.collapse");
+                Await(() => FindWindow("resume.collapse") is null, "warm resume collapsed");
+                Require(Native.IsIconic(hwnd) && state.Current.WindowVisualState == WindowVisualState.Minimized, "Collapsing warm resume exposed the dashboard.");
+            }));
+            Test("resume.cold-eligible-keeps-dashboard-hidden", () => InScenarioVault("resume-cold", () =>
+            {
+                const string fixtureTitle = "Dedicated cold resume card";
+                CreateScenarioCard(fixtureTitle, "Cold resume directly into the strip");
+                Stop(_app!); _app = Launch("--resume");
+                var strip = WindowWith("resume.collapse");
+                RequireVisible(strip, "cold resume strip"); AssertDashboardHidden();
+                Require(Element(strip, "resume.next").Current.Name == "Cold resume directly into the strip", "Cold resume did not load the persisted eligible card.");
+                Await(() => FindCard(fixtureTitle)?.GetProperty("status").GetString() == "active", "cold resume persisted active status");
+                Require(FindWindow("capture.title") is null, "Eligible cold resume unexpectedly opened capture.");
+                Screenshot(strip, "16-cold-quiet-resume");
+                Invoke(strip, "resume.collapse");
+                Await(() => FindWindow("resume.collapse") is null, "cold resume collapsed"); AssertDashboardHidden();
+            }));
+            Test("resume.cold-no-eligible-opens-capture-only", () => InScenarioVault("resume-no-eligible", () =>
+            {
+                const string fixtureTitle = "Dedicated completed resume card";
+                CreateScenarioCard(fixtureTitle, "This completed card must not resume");
+                Invoke(MainWindow(), "detail.complete");
+                Await(() => FindCard(fixtureTitle)?.GetProperty("status").GetString() == "done", "no-eligible fixture completed");
+                var before = File.ReadAllText(VaultFile);
+                Stop(_app!); _app = Launch("--resume");
+                var capture = WindowWith("capture.title"); RequireVisible(capture, "no-eligible capture");
+                AssertDashboardHidden();
+                Require(FindWindow("resume.collapse") is null, "No-eligible resume incorrectly opened a strip.");
+                Require(Value(capture, "capture.title") == "" && Value(capture, "capture.next") == "", "No-eligible resume did not open a fresh capture.");
+                Require(File.ReadAllText(VaultFile) == before, "No-eligible resume modified completed cards.");
+                Screenshot(capture, "17-no-eligible-capture");
+                Invoke(capture, "capture.cancel");
+                Await(() => FindWindow("capture.title") is null, "no-eligible capture cancelled"); AssertDashboardHidden();
+            }));
+            Test("progress.blank-note-updates-next-without-checkpoint", () => InScenarioVault("progress-next-only", () =>
+            {
+                const string fixtureTitle = "Dedicated next-only progress card";
+                CreateScenarioCard(fixtureTitle, "Original next-only action");
+                SeedScenarioCheckpoint("Existing progress must survive");
+                var before = FindCard(fixtureTitle)!.Value;
+                Invoke(MainWindow(), "detail.resume"); var strip = WindowWith("resume.collapse");
+                Invoke(strip, "resume.checkpoint"); var prompt = WindowWith("prompt.input");
+                Set(prompt, "prompt.input", ""); Set(prompt, "prompt.next", "Updated next action without a progress note");
+                Invoke(prompt, "prompt.confirm");
+                Await(() => FindWindow("prompt.input") is null && FindCard(fixtureTitle)?.GetProperty("nextAction").GetString() == "Updated next action without a progress note", "blank-progress next action saved");
+                AssertCheckpointAndContextUnchanged(before, FindCard(fixtureTitle)!.Value);
+                Await(() => Element(strip, "resume.next").Current.Name == "Updated next action without a progress note", "next-only live strip refresh");
+                Screenshot(strip, "18-next-only-progress");
+            }));
+            Test("progress.blank-note-identical-next-stays-inline", () => InScenarioVault("progress-no-op", () =>
+            {
+                const string fixtureTitle = "Dedicated no-op progress card";
+                const string fixtureNext = "Unchanged next action";
+                CreateScenarioCard(fixtureTitle, fixtureNext); SeedScenarioCheckpoint("Retain prior checkpoint through validation");
+                var before = FindCard(fixtureTitle)!.Value; var bytes = File.ReadAllText(VaultFile);
+                Invoke(MainWindow(), "detail.checkpoint"); var prompt = WindowWith("prompt.input");
+                Set(prompt, "prompt.input", ""); Set(prompt, "prompt.next", fixtureNext); Invoke(prompt, "prompt.confirm");
+                Await(() => Find(prompt, "prompt.error") is { } error && !error.Current.IsOffscreen && !string.IsNullOrWhiteSpace(error.Current.Name), "unchanged blank-progress inline validation");
+                Require(FindWindow("prompt.input") is not null, "No-op progress falsely closed the dialog.");
+                Require(Value(prompt, "prompt.input") == "" && Value(prompt, "prompt.next") == fixtureNext, "No-op validation discarded dialog fields.");
+                Require(File.ReadAllText(VaultFile) == bytes, "No-op progress modified the saved vault.");
+                Screenshot(prompt, "19-no-op-progress-validation");
+                Set(prompt, "prompt.next", "Changed next after inline validation"); Invoke(prompt, "prompt.confirm");
+                Await(() => FindWindow("prompt.input") is null && FindCard(fixtureTitle)?.GetProperty("nextAction").GetString() == "Changed next after inline validation", "same dialog saves changed next with blank progress");
+                AssertCheckpointAndContextUnchanged(before, FindCard(fixtureTitle)!.Value);
+            }));
+            Test("draft.capture-crash-explicit-recovery-and-save", () => InScenarioVault("draft-crash", () =>
+            {
+                const string draftTitle = "Recover this synthetic unsaved capture";
+                const string draftNext = "Continue after explicit recovery";
+                const string draftContext = "Unsaved context must survive a forced owned-process stop.";
+                Invoke(MainWindow(), "main.capture"); var capture = WindowWith("capture.title");
+                Require(((TogglePattern)Element(capture, "capture.autoDraft").GetCurrentPattern(TogglePattern.Pattern)).Current.ToggleState == ToggleState.On, "New capture autosave must default on.");
+                Set(capture, "capture.title", draftTitle); Set(capture, "capture.next", draftNext); Set(capture, "capture.context", draftContext);
+                Await(() => DraftCard(draftTitle) is { } draft && draft.GetProperty("nextAction").GetString() == draftNext && draft.GetProperty("context").GetString() == draftContext, "capture draft flushed to dedicated vault");
+                Await(() => Element(capture, "capture.draftStatus").Current.Name.Contains("已暂存", StringComparison.Ordinal), "draft autosave status");
+                string draftId = DraftCard(draftTitle)!.Value.GetProperty("id").GetString()!;
+                Require(ReadCards().Length == 0, "Autosave incorrectly created a formal card.");
+                Screenshot(capture, "20-autosaved-capture-draft");
+                Stop(_app!); Start();
+                Require(FindWindow("capture.title") is null && FindWindow("drafts.close") is null, "Startup unsolicitedly opened draft recovery.");
+                Require(ReadCards().Length == 0, "Crash restart imported a draft without consent.");
+                var recovered = RestoreDraft(draftId);
+                Require(Value(recovered, "capture.title") == draftTitle && Value(recovered, "capture.next") == draftNext && Value(recovered, "capture.context") == draftContext, "Explicit draft recovery lost fields.");
+                Screenshot(recovered, "21-recovered-capture-draft");
+                Invoke(recovered, "capture.save");
+                Await(() => FindWindow("capture.title") is null && FindCard(draftTitle)?.GetProperty("id").GetString() == draftId && DraftFiles().Length == 0, "recovered card formally saved with same identity and draft removed");
+                Require(ReadCards().Length == 1, "Recovered draft saved duplicate cards.");
+                Stop(_app!); Start();
+                Require(ReadCards().Length == 1 && FindCard(draftTitle)?.GetProperty("id").GetString() == draftId && DraftFiles().Length == 0, "Recovered formal card or draft cleanup changed after restart.");
+                Require(Find(MainWindow(), "main.drafts") is not { } entry || entry.Current.IsOffscreen, "Completed recovery still advertises a recoverable draft.");
+            }));
+            Test("draft.capture-opt-out-keeps-typing-off-disk", () => InScenarioVault("draft-opt-out", () =>
+            {
+                const string draftTitle = "Synthetic draft with autosave disabled";
+                Invoke(MainWindow(), "main.capture"); var capture = WindowWith("capture.title");
+                var autoDraft = Element(capture, "capture.autoDraft"); EnsureOwned(autoDraft);
+                var toggle = (TogglePattern)autoDraft.GetCurrentPattern(TogglePattern.Pattern);
+                Require(toggle.Current.ToggleState == ToggleState.On, "New capture autosave must default on.");
+                toggle.Toggle(); Await(() => toggle.Current.ToggleState == ToggleState.Off, "capture autosave opted out");
+                Set(capture, "capture.title", draftTitle); Set(capture, "capture.next", "Save only when explicitly requested");
+                Set(capture, "capture.context", "No draft file should contain these synthetic fields.");
+                // Observe beyond the 800 ms debounce, rather than checking before a timer could fire.
+                var observation = Stopwatch.StartNew();
+                while (observation.ElapsedMilliseconds < 1800)
+                {
+                    Require(DraftFiles().Length == 0 && ReadCards().Length == 0, "Opted-out capture wrote draft or formal data before explicit save.");
+                    Thread.Sleep(80);
+                }
+                Require(DraftFiles().Length == 0, "Opted-out capture wrote a delayed draft.");
+                Metrics.Add(new { name = "draftOptOutObservation", elapsedMs = observation.ElapsedMilliseconds, draftFiles = 0 });
+                Invoke(capture, "capture.save");
+                Await(() => FindWindow("capture.title") is null && FindCard(draftTitle) is not null, "opted-out capture explicitly saved");
+                Require(DraftFiles().Length == 0, "Explicit save after opt-out left a draft file.");
+            }));
+            Test("draft.keep-close-remains-uncommitted-until-recovery", () => InScenarioVault("draft-keep", () =>
+            {
+                const string draftTitle = "Keep this capture for later";
+                Invoke(MainWindow(), "main.capture"); var capture = WindowWith("capture.title");
+                Set(capture, "capture.title", draftTitle); Set(capture, "capture.next", "Resume editing the kept draft");
+                Invoke(capture, "capture.keepDraft");
+                Await(() => FindWindow("capture.title") is null && DraftCard(draftTitle) is not null, "keep draft saved and closed capture");
+                Require(ReadCards().Length == 0, "Keep draft incorrectly committed a formal card.");
+                string draftId = DraftCard(draftTitle)!.Value.GetProperty("id").GetString()!;
+                var recovered = RestoreDraft(draftId);
+                Require(Value(recovered, "capture.title") == draftTitle && Value(recovered, "capture.next") == "Resume editing the kept draft", "Kept draft lost captured fields.");
+                Set(recovered, "capture.next", "Finish editing after keep-draft recovery"); Invoke(recovered, "capture.save");
+                Await(() => FindWindow("capture.title") is null && FindCard(draftTitle)?.GetProperty("nextAction").GetString() == "Finish editing after keep-draft recovery" && DraftFiles().Length == 0, "kept draft formally saved and removed");
+                Require(FindCard(draftTitle)?.GetProperty("id").GetString() == draftId && ReadCards().Length == 1, "Keep-draft recovery changed identity or duplicated the card.");
+            }));
             Test("hotkey.collision-status", () =>
             {
                 Stop(_app!);
@@ -386,6 +534,90 @@ internal static class Program
             if (Directory.Exists(Path.Combine(d.FullName, "native", "Relay.Desktop"))) return d.FullName;
         throw new DirectoryNotFoundException("Run from the repository or pass --workspace.");
     }
+    // Every 2.1 scenario owns a fresh nested vault; original suite selection/state is restored even on failure.
+    private static void InScenarioVault(string name, Action body)
+    {
+        string originalVault = _vault;
+        if (_app is not null) Stop(_app);
+        _vault = Path.Combine(originalVault, "scenario-" + name + "-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_vault);
+        Metrics.Add(new { name = "scenarioVault", scenario = name, vault = _vault });
+        try { Start(); body(); }
+        catch
+        {
+            try
+            {
+                var window = FindWindow("prompt.input") ?? FindWindow("capture.title") ?? FindWindow("resume.collapse") ?? FindWindow("main.capture");
+                if (window is not null) Screenshot(window, "failure-" + name);
+            }
+            catch { }
+            throw;
+        }
+        finally
+        {
+            try { if (_app is not null) Stop(_app); }
+            finally { _vault = originalVault; }
+            Start();
+        }
+    }
+    private static void CreateScenarioCard(string title, string next)
+    {
+        Require(ReadCards().Length == 0, "Scenario vault must begin empty.");
+        Invoke(MainWindow(), "main.capture"); var capture = WindowWith("capture.title");
+        Set(capture, "capture.title", title); Set(capture, "capture.next", next);
+        Set(capture, "capture.context", "Dedicated synthetic 2.1 fixture; preserve this context.");
+        Invoke(capture, "capture.save");
+        Await(() => FindCard(title) is not null && FindWindow("capture.title") is null, "dedicated scenario card committed");
+        Require(ReadCards().Length == 1, "Scenario must not inherit cards from another test.");
+        Invoke(MainWindow(), "card." + FindCard(title)!.Value.GetProperty("id").GetString());
+    }
+    private static void SeedScenarioCheckpoint(string text)
+    {
+        Invoke(MainWindow(), "detail.checkpoint"); var prompt = WindowWith("prompt.input");
+        Set(prompt, "prompt.input", text); Invoke(prompt, "prompt.confirm");
+        Await(() => FindWindow("prompt.input") is null && ReadCards()[0].GetProperty("checkpoints").GetArrayLength() == 1, "dedicated existing checkpoint committed");
+    }
+    private static void AssertCheckpointAndContextUnchanged(JsonElement before, JsonElement after)
+    {
+        Require(after.GetProperty("checkpoints").GetArrayLength() == before.GetProperty("checkpoints").GetArrayLength(), "Blank progress created an empty checkpoint.");
+        foreach (string field in new[] { "id", "context", "resources", "checkpoints" })
+            Require(after.GetProperty(field).GetRawText() == before.GetProperty(field).GetRawText(), "Next-only progress unexpectedly changed " + field + ".");
+    }
+    private static string[] DraftFiles()
+    {
+        string directory = Path.Combine(_vault, "drafts");
+        return Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json", SearchOption.TopDirectoryOnly) : [];
+    }
+    private static JsonElement? DraftCard(string title)
+    {
+        foreach (string path in DraftFiles())
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            var envelope = document.RootElement;
+            Require(envelope.GetProperty("version").GetInt32() == 1, "Unexpected draft schema version.");
+            Require(envelope.GetProperty("savedAt").ValueKind == JsonValueKind.String, "Draft save timestamp missing.");
+            var card = envelope.GetProperty("card");
+            if (card.GetProperty("title").GetString() == title) return card.Clone();
+        }
+        return null;
+    }
+    private static AutomationElement RestoreDraft(string id)
+    {
+        Await(() => Find(MainWindow(), "main.drafts") is { } entry && !entry.Current.IsOffscreen, "explicit draft recovery entry");
+        Invoke(MainWindow(), "main.drafts"); var recovery = WindowWith("drafts.close");
+        Invoke(recovery, "drafts.restore." + id);
+        return WindowWith("capture.title");
+    }
+    private static void Forward(params string[] args)
+    {
+        var secondary = Launch(args);
+        Require(secondary.WaitForExit(WaitMs) && secondary.ExitCode == 0, "Secondary request did not exit successfully after forwarding.");
+    }
+    private static void RequireVisible(AutomationElement window, string description)
+    {
+        EnsureOwned(window);
+        Require(!window.Current.IsOffscreen && !window.Current.BoundingRectangle.IsEmpty && window.Current.BoundingRectangle.Width > 0, description + " is not visible.");
+    }
     private static string VaultFile => Path.Combine(_vault, "vault.json");
     private static JsonElement ReadFocus()
     {
@@ -422,7 +654,7 @@ internal static class Program
     private static void AssertDashboardHidden()
     {
         var main = FindWindow("main.capture");
-        Require(main is null || main.Current.IsOffscreen, "Background capture exposed the dashboard.");
+        Require(main is null || main.Current.IsOffscreen, "Background entry exposed the dashboard.");
         Metrics.Add(new { name = "backgroundCapture", processId = _app!.Id, dashboardExposed = false });
     }
     private static AutomationElement MainWindow() => WindowWith("main.capture");

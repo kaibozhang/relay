@@ -11,6 +11,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
 using Relay.Core;
+using Relay.Desktop.Services;
+using System.Windows.Threading;
 
 namespace Relay.Desktop;
 
@@ -26,6 +28,16 @@ public sealed class CaptureWindow : Window
     private readonly TextBlock _resourceCount;
     private bool _dirty;
     private bool _saved;
+    private CaptureDraftStore? _draftStore;
+    private readonly DispatcherTimer _draftTimer=new(){Interval=TimeSpan.FromMilliseconds(800)};
+    private readonly TextBlock _draftStatus=RelayWindowUi.Text("",10,RelayWindowUi.Muted);
+    private readonly CheckBox _draftEnabled=new(){Content="本次新卡自动暂存到本机（明文）",IsChecked=true};
+    private readonly StackPanel _draftControls=new();
+    private string? _lastDraftSignature;
+    private bool _keepDraft;
+    private bool _changingDraftOption;
+    private DateTimeOffset _lastDraftEdit;
+    private string? _draftPrivacyWarning;
     public RelayCard? ResultCard { get; private set; }
     /// <summary>Optional persistence boundary. Return false or throw to retain the draft in this dialog.</summary>
     public Func<RelayCard, bool>? SaveHandler { get; set; }
@@ -110,6 +122,9 @@ public sealed class CaptureWindow : Window
 
         var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         Grid.SetRow(footer, 2); root.Children.Add(footer);
+        _draftControls.Visibility=Visibility.Collapsed;_draftControls.Children.Add(_draftEnabled);_draftControls.Children.Add(_draftStatus);
+        var keep=RelayWindowUi.Button("暂存并收起",KeepDraft,"capture.keepDraft");keep.HorizontalAlignment=HorizontalAlignment.Left;_draftControls.Children.Add(keep);footer.Children.Add(_draftControls);
+        AutomationProperties.SetAutomationId(_draftStatus,"capture.draftStatus");AutomationProperties.SetAutomationId(_draftEnabled,"capture.autoDraft");
         _message = RelayWindowUi.Text("", 12, RelayWindowUi.Error);
         _message.Visibility = Visibility.Collapsed;
         AutomationProperties.SetAutomationId(_message, "capture.message");
@@ -148,9 +163,59 @@ public sealed class CaptureWindow : Window
             e.Handled = true;
         };
         Closing += ConfirmDiscard;
+        Closed += (_,_)=>_draftTimer.Stop();
+        _draftTimer.Tick+=(_,_)=>{if(DateTimeOffset.UtcNow-_lastDraftEdit>=TimeSpan.FromMilliseconds(800))SaveDraft();};
+        _draftEnabled.Click+=(_,_)=>ChangeDraftOption();
         Loaded += (_, _) => { _next.Focus(); _next.CaretIndex = _next.Text.Length; };
     }
 
+    /// <summary>Only new-card capture uses disk drafts; edits retain their original transaction semantics.</summary>
+    public void EnableDraftRecovery(CaptureDraftStore store,bool recovered=false)
+    {
+        _draftStore=store??throw new ArgumentNullException(nameof(store));_draftControls.Visibility=Visibility.Visible;Title=recovered?"恢复草稿 · 续页":"留个下一步 · 续页";Height=760;
+        _draftStatus.Text=recovered?"已恢复未提交草稿；正式保存后才会进入续页。":"输入后约 0.8 秒暂存；可关闭本次暂存。正式保存仍需点击。";
+        if(recovered){_dirty=true;_lastDraftSignature=null;}
+        _draftTimer.Start();
+    }
+    private RelayCard DraftSnapshot()
+    {
+        var copy=JsonSerializer.Deserialize<RelayCard>(JsonSerializer.Serialize(_draft))!;
+        copy.Title=_title.Text;copy.NextAction=_next.Text;copy.Context=_context.Text;copy.UpdatedAt=DateTimeOffset.UtcNow;return copy;
+    }
+    private bool SaveDraft()
+    {
+        if(_draftStore==null||_draftEnabled.IsChecked!=true||_saved||!_dirty)return false;
+        try
+        {
+            var snapshot=DraftSnapshot();var signature=JsonSerializer.Serialize(new{snapshot.Title,snapshot.NextAction,snapshot.Context,snapshot.Resources});
+            if(signature==_lastDraftSignature)return true;
+            if(string.IsNullOrWhiteSpace(snapshot.Title)&&string.IsNullOrWhiteSpace(snapshot.NextAction)&&string.IsNullOrWhiteSpace(snapshot.Context)&&snapshot.Resources.Count==0){if(!ClearDraft())return false;_lastDraftSignature=signature;_draftStatus.Text="空白草稿无需暂存。";return true;}
+            _draftStore.Save(snapshot);_lastDraftSignature=signature;_draftStatus.Text=(_draftPrivacyWarning==null?"":_draftPrivacyWarning+" ")+"草稿已暂存到本机 · "+DateTime.Now.ToString("HH:mm:ss")+" · 尚未正式提交";return true;
+        }
+        catch(Exception error){_draftStatus.Text="草稿未能暂存："+error.Message+"（内容仍在此窗口）";return false;}
+    }
+    private bool ClearDraft()
+    {
+        if(_draftStore==null)return true;
+        try{_draftStore.Delete(_draft.Id);return true;}
+        catch(Exception error){_draftStatus.Text="未能清除暂存副本："+error.Message;return false;}
+    }
+    private void KeepDraft()
+    {
+        if(_draftStore==null)return;
+        if(_draftEnabled.IsChecked!=true){_draftStatus.Text="请先开启本次暂存，或正式保存。";return;}
+        if(!_dirty){_keepDraft=true;Close();return;}
+        _lastDraftSignature=null; // Explicit keep confirms a fresh write rather than cached status.
+        if(SaveDraft()){_keepDraft=true;Close();}
+    }
+    private void ChangeDraftOption()
+    {
+        if(_changingDraftOption||_draftStore==null)return;
+        if(_draftEnabled.IsChecked==true){_lastDraftSignature=null;_draftStatus.Text="已开启本次本地暂存。";return;}
+        if(!ClearDraft()){_draftPrivacyWarning="关闭失败，自动暂存仍开启；请处理写入权限后再次关闭。";_draftStatus.Text=_draftPrivacyWarning;_changingDraftOption=true;_draftEnabled.IsChecked=true;_changingDraftOption=false;return;}
+        _draftPrivacyWarning=null;
+        _lastDraftSignature=null;_draftStatus.Text="本次暂存已关闭，原暂存副本已清除；未提交内容只在内存。";
+    }
     private static void AddField(Panel form, string caption, TextBox input, bool prominent = false)
     {
         var label = new Label { Content = caption, Target = input, FontSize = 12,
@@ -161,13 +226,15 @@ public sealed class CaptureWindow : Window
         input.Margin = new Thickness(0, 0, 0, 13); form.Children.Add(input);
     }
 
-    private void MarkDirty(object sender, TextChangedEventArgs e) => _dirty = true;
+    private void MarkDirty(object sender, TextChangedEventArgs e) { _dirty=true;_lastDraftEdit=DateTimeOffset.UtcNow; }
 
     private void ConfirmDiscard(object? sender, CancelEventArgs e)
     {
-        if (_saved || !_dirty) return;
+        if (_saved || _keepDraft) return;
+        if(!_dirty){if(!ClearDraft())e.Cancel=true;return;}
         e.Cancel = MessageBox.Show(this, "这次修改还没有保存。要放弃并关闭吗？", "保留你的下一步",
             MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes;
+        if(!e.Cancel&&!ClearDraft())e.Cancel=true;
     }
 
     private void Save()
@@ -194,6 +261,7 @@ public sealed class CaptureWindow : Window
             }
             ResultCard = _draft;
             _saved = true;
+            _draftTimer.Stop();if(!ClearDraft())MessageBox.Show(this,"正式续页已保存，但暂存副本未能清除。它仍留在本地草稿目录；恢复列表会阻止重复提交，可稍后明确放弃。","已保存，草稿清理未完成",MessageBoxButton.OK,MessageBoxImage.Warning);
             try { DialogResult = true; }
             catch { _saved = false; ResultCard = null; throw; }
         });

@@ -7,7 +7,7 @@ using System.Windows.Input;
 
 namespace Relay.Desktop;
 
-/// <summary>Records a checkpoint and its next step in one caller-owned transaction.</summary>
+/// <summary>Updates the next step with an optional checkpoint in one caller-owned transaction.</summary>
 public sealed class ProgressWindow : Window
 {
     private readonly TextBox _progress;
@@ -15,6 +15,7 @@ public sealed class ProgressWindow : Window
     private readonly TextBlock _error;
     private readonly Button _confirm;
     private readonly Func<string, string, bool> _save;
+    private readonly string _initialNext;
     private bool _dirty;
     private bool _saved;
     private bool _saving;
@@ -23,6 +24,7 @@ public sealed class ProgressWindow : Window
     {
         ArgumentNullException.ThrowIfNull(save);
         _save = save;
+        _initialNext = (currentNext ?? "").Trim();
         if (owner is not null) Owner = owner;
         Title = "留个进展 · 续页";
         Width = 540; Height = 480; MinWidth = 440; MinHeight = 420;
@@ -37,7 +39,7 @@ public sealed class ProgressWindow : Window
         Content = root;
         var header = new StackPanel { Margin = new Thickness(0, 0, 0, 18) };
         header.Children.Add(RelayWindowUi.Text("RELAY  /  记住这一小步", 11, RelayWindowUi.Green, true));
-        var heading = RelayWindowUi.Text("进展留下，下一步更清楚。", 25);
+        var heading = RelayWindowUi.Text("下一步更清楚，进展按需留。", 25);
         heading.FontFamily = RelayWindowUi.DisplayFont; heading.Margin = new Thickness(0, 8, 0, 6);
         header.Children.Add(heading);
         var cardTitle = RelayWindowUi.Text(title ?? "", 12, RelayWindowUi.Muted);
@@ -46,12 +48,12 @@ public sealed class ProgressWindow : Window
         var form = new StackPanel();
         var scroll = new ScrollViewer { Content = form, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         Grid.SetRow(scroll, 1); root.Children.Add(scroll);
-        _progress = RelayWindowUi.Input("", "prompt.input", 2000, true);
-        _progress.MinHeight = 85; _progress.MaxHeight = 150;
-        AddField(form, "刚刚推进了什么？ *", _progress);
         _next = RelayWindowUi.Input(currentNext ?? "", "prompt.next", 2000, true);
         _next.MinHeight = 68; _next.MaxHeight = 130; _next.BorderBrush = RelayWindowUi.Green;
         AddField(form, "NEXT ACTION  /  接下来做什么？ *", _next);
+        _progress = RelayWindowUi.Input("", "prompt.input", 2000, true);
+        _progress.MinHeight = 85; _progress.MaxHeight = 150;
+        AddField(form, "刚刚推进了什么？（选填）", _progress);
         var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         Grid.SetRow(footer, 2); root.Children.Add(footer);
         _error = RelayWindowUi.Text("", 12, RelayWindowUi.Error);
@@ -60,7 +62,7 @@ public sealed class ProgressWindow : Window
         AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Assertive);
         footer.Children.Add(_error);
         var actions = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
-        _confirm = RelayWindowUi.Button("记下进展与下一步", Save, "prompt.confirm", true);
+        _confirm = RelayWindowUi.Button("保存下一步", Save, "prompt.confirm", true);
         DockPanel.SetDock(_confirm, Dock.Right); actions.Children.Add(_confirm);
         var cancel = RelayWindowUi.Button("取消", Close, "prompt.cancel");
         DockPanel.SetDock(cancel, Dock.Right); actions.Children.Add(cancel);
@@ -76,7 +78,7 @@ public sealed class ProgressWindow : Window
             { Save(); e.Handled = true; }
         };
         Closing += ConfirmDiscard;
-        Loaded += (_, _) => _progress.Focus();
+        Loaded += (_, _) => _next.Focus();
     }
 
     private static void AddField(Panel panel, string caption, TextBox field)
@@ -90,16 +92,18 @@ public sealed class ProgressWindow : Window
     private void Save()
     {
         if (_saving) return;
-        if (string.IsNullOrWhiteSpace(_progress.Text))
-        { Error("写下一点具体进展，再保存。"); _progress.Focus(); return; }
-        if (string.IsNullOrWhiteSpace(_next.Text))
+        var progress = _progress.Text.Trim();
+        var next = _next.Text.Trim();
+        if (next.Length == 0)
         { Error("请留下接下来的一个动作。"); _next.Focus(); return; }
         if (_progress.Text.Length > 2000 || _next.Text.Length > 2000)
         { Error("进展和下一步各最多 2000 字。"); return; }
+        if (progress.Length == 0 && string.Equals(next, _initialNext, StringComparison.Ordinal))
+        { Error("下一步没有变化；修改后再保存，或关闭。"); _next.Focus(); return; }
         _saving = true; _confirm.IsEnabled = false;
         try
         {
-            if (!_save(_progress.Text.Trim(), _next.Text.Trim()))
+            if (!_save(progress, next))
             { Error("保存未完成，内容仍在这里。处理保存问题后可以重试。"); return; }
             _saved = true;
             DialogResult = true;

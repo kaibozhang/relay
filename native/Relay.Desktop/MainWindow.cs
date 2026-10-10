@@ -17,6 +17,8 @@ namespace Relay.Desktop;
 public sealed class MainWindow : Window
 {
     private readonly VaultStore _store;
+    private readonly CaptureDraftStore _draftStore;
+    private readonly Button _draftButton=Ui.Id(new Button(),"main.drafts");
     private VaultDocument _document;
     private readonly Grid _root=new();
     private readonly StackPanel _navigation=new();
@@ -48,7 +50,7 @@ public sealed class MainWindow : Window
         Title="续页 · Relay — 接着做，不必重新找";Width=1180;Height=790;MinWidth=900;MinHeight=620;
         Background=Ui.Paper;Foreground=Ui.Ink;FontFamily=new FontFamily("Microsoft YaHei UI");FontSize=14;
         WindowStartupLocation=WindowStartupLocation.CenterScreen;
-        _store=new VaultStore(directory);_document=_store.Load();Ui.Id(_status,"main.status");
+        _store=new VaultStore(directory);_document=_store.Load();_draftStore=new CaptureDraftStore(directory);Ui.Id(_status,"main.status");
         _focusStore=new FocusSessionStore(directory);try{_focusStore.Load();}catch(Exception error){Notice("专注状态未能读取："+error.Message);}
         _root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(196)});
         _root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(345)});
@@ -80,7 +82,8 @@ public sealed class MainWindow : Window
     {
         var dock=new DockPanel{LastChildFill=true,Margin=new Thickness(22,27,19,18)};
         var top=Ui.Stack(Ui.Text("把下一步，留给未来的自己。",15,Ui.Ink,true),new Border{Height=14});
-        var capture=Ui.Id(Ui.Button("＋ 留下续做卡",()=>Capture(),true),"main.capture");capture.HorizontalAlignment=HorizontalAlignment.Stretch;capture.Margin=new Thickness(0,0,0,16);top.Children.Add(capture);
+        var capture=Ui.Id(Ui.Button("＋ 留下续做卡",()=>Capture(),true),"main.capture");capture.HorizontalAlignment=HorizontalAlignment.Stretch;capture.Margin=new Thickness(0,0,0,10);top.Children.Add(capture);
+        _draftButton.Content="恢复未提交草稿";_draftButton.Margin=new Thickness(0,0,0,12);_draftButton.Padding=new Thickness(8);_draftButton.Background=Ui.Surface;_draftButton.Foreground=Ui.Ink;_draftButton.BorderBrush=Ui.Line;_draftButton.Click+=(_,_)=>ShowDrafts();top.Children.Add(_draftButton);
         System.Windows.Automation.AutomationProperties.SetName(_search,"搜索续页标题、下一步、上下文或资源");_search.ToolTip="搜索标题、下一步、上下文或资源名称 · Ctrl+F";top.Children.Add(_search);Ui.Gap(top,13);top.Children.Add(_count);Ui.Gap(top,12);DockPanel.SetDock(top,Dock.Top);dock.Children.Add(top);
         var scroll=new ScrollViewer{Content=_list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};dock.Children.Add(scroll);Grid.SetColumn(dock,1);_root.Children.Add(dock);
         var divider=new Border{Width=1,Background=Ui.Line,HorizontalAlignment=HorizontalAlignment.Right};Grid.SetColumn(divider,1);_root.Children.Add(divider);
@@ -93,7 +96,7 @@ public sealed class MainWindow : Window
     }
     private void Render()
     {
-        var focus=FocusedControlId();RenderNavigation();RenderList();RestoreControlFocus(focus);
+        var focus=FocusedControlId();RenderNavigation();RenderList();RestoreControlFocus(focus);RefreshDraftCount();
         _status.Text=_store.IsReadOnly?"只读恢复模式 · 先导出或选择新仓库":(_document.Revision==0?"本地仓库 · 保存第一张续页后写入 · ":"已写入磁盘 · ")+_store.DataPath;
     }
     private void RenderNavigation()
@@ -188,14 +191,40 @@ public sealed class MainWindow : Window
         try{if(_store.IsReadOnly)throw new InvalidOperationException("仓库处于只读恢复模式，请先导出并使用新的数据目录。");var candidate=VaultStore.Clone(_document);change(candidate);_store.Save(candidate);_document=candidate;if(render)Render();return true;}
         catch(Exception error){MessageBox.Show(_capture is {IsVisible:true}?_capture:_progress is {IsVisible:true}?_progress:_strip is {IsVisible:true}?_strip:this,"修改未写入，原有数据仍保留。\n\n"+error.Message,"保存未完成",MessageBoxButton.OK,MessageBoxImage.Warning);return false;}
     }
-    public void Capture(IEnumerable<string>? resources=null,bool background=false)
+    public void Capture(IEnumerable<string>? resources=null,bool background=false,CaptureDraft? recovered=null)
     {
         if(_progress is {IsVisible:true}){if(resources!=null)_queuedResources.AddRange(resources.Take(100-_queuedResources.Count));_progress.Activate();Notice("先完成当前进展；新的文件引用将在关闭后打开捕捉窗口。");return;}
         if(_capture!=null){if(resources!=null)_capture.AddResources(resources);_capture.Activate();return;}
-        if(!background)ShowMain();_capture=new CaptureWindow(null,resources);
+        if(!background)ShowMain();_capture=new CaptureWindow(recovered?.Card,resources);
+        if(!_store.IsReadOnly)_capture.EnableDraftRecovery(_draftStore,recovered!=null);
         if(!background&&IsVisible)_capture.Owner=this;else _capture.WindowStartupLocation=WindowStartupLocation.CenterScreen;
-        _capture.SaveHandler=card=>Mutate(d=>d.Cards.Insert(0,card),false);
-        try{if(_capture.ShowDialog()==true&&_capture.ResultCard is RelayCard card){_filter="ready";_selected=card.Id;Render();Notice("下一步已经写入磁盘。随时可以离开，回来接着做。");}}finally{_capture=null;}
+        _capture.SaveHandler=card=>{if(_document.Cards.Exists(c=>c.Id==card.Id)){MessageBox.Show(_capture,"这份草稿对应的续页已经存在，不会覆盖或重复添加。请关闭并查看已有续页。","草稿已提交");return false;}return Mutate(d=>d.Cards.Insert(0,card),false);};
+        try{if(_capture.ShowDialog()==true&&_capture.ResultCard is RelayCard card){_filter="ready";_selected=card.Id;Render();Notice("下一步已经写入磁盘。随时可以离开，回来接着做。");}}finally{_capture=null;RefreshDraftCount();}
+    }
+    private IReadOnlyList<CaptureDraft> RecoverableDrafts()
+    {
+        // An ID match after import is not consent to discard divergent draft contents.
+        return _draftStore.List();
+    }
+    private void RefreshDraftCount()
+    {
+        try{var count=RecoverableDrafts().Count;_draftButton.Content="未提交草稿 · "+count;_draftButton.Visibility=count>0||!string.IsNullOrEmpty(_draftStore.Warning)?Visibility.Visible:Visibility.Collapsed;}
+        catch(Exception error){_draftButton.Content="草稿暂不可读";_draftButton.ToolTip=error.Message;_draftButton.Visibility=Visibility.Visible;}
+    }
+    private void ShowDrafts()
+    {
+        if(_capture is {IsVisible:true}){_capture.Activate();return;}if(_progress is {IsVisible:true}){_progress.Activate();return;}
+        try
+        {
+            var drafts=RecoverableDrafts();var dialog=new DraftRecoveryWindow(this,drafts,_draftStore.Warning,id=>{try{_draftStore.Delete(id);RefreshDraftCount();return true;}catch(Exception error){MessageBox.Show(error.Message,"草稿未删除");return false;}});
+            if(dialog.ShowDialog()==true&&dialog.SelectedDraft is {} selected)
+            {
+                if(_document.Cards.Any(c=>string.Equals(c.Id,selected.Card.Id,StringComparison.OrdinalIgnoreCase))){MessageBox.Show(this,"这份草稿的标识已对应一张正式续页。为避免覆盖或重复，不会恢复；请先查看已有续页。草稿仍保留，可在列表明确放弃。","已提交或存在冲突",MessageBoxButton.OK,MessageBoxImage.Information);}
+                else Capture(recovered:selected);
+            }
+            RefreshDraftCount();
+        }
+        catch(Exception error){MessageBox.Show(this,error.Message,"无法读取草稿",MessageBoxButton.OK,MessageBoxImage.Warning);}
     }
     private void Edit(string id)
     {
@@ -216,12 +245,12 @@ public sealed class MainWindow : Window
     {
         if(_capture is {IsVisible:true}){_capture.Activate();return;}if(_progress is {IsVisible:true}){_progress.Activate();return;}
         var blocking=OwnedWindows.Cast<Window>().FirstOrDefault(w=>w.IsVisible&&w!=_strip);if(blocking!=null){blocking.Activate();return;}
-        ShowMain();var card=_document.Cards.Where(c=>c.Status!="done"&&(!c.SnoozedUntil.HasValue||c.SnoozedUntil<=DateTimeOffset.Now)).OrderByDescending(c=>c.Status=="active").ThenByDescending(c=>c.Pinned).ThenByDescending(c=>c.UpdatedAt).FirstOrDefault();if(card==null){Capture();return;}Resume(card.Id);
+        var card=_document.Cards.Where(c=>c.Status!="done"&&(!c.SnoozedUntil.HasValue||c.SnoozedUntil<=DateTimeOffset.Now)).OrderByDescending(c=>c.Status=="active").ThenByDescending(c=>c.Pinned).ThenByDescending(c=>c.UpdatedAt).FirstOrDefault();if(card==null){Capture(background:true);return;}Resume(card.Id);
     }
     private void Checkpoint(string id,Window? owner=null)
     {
         if(_progress!=null){_progress.Activate();return;}var current=_document.Cards.FirstOrDefault(c=>c.Id==id);if(current==null)return;
-        var dialog=new ProgressWindow(owner??this,"留个进展，让下一步更清楚",current.NextAction,(progress,next)=>Mutate(d=>{var c=d.Cards.First(c=>c.Id==id);c.Checkpoints.Add(new Checkpoint{At=DateTimeOffset.Now,Text=progress});c.NextAction=next;c.UpdatedAt=DateTimeOffset.Now;}));
+        var dialog=new ProgressWindow(owner??this,"留个进展，让下一步更清楚",current.NextAction,(progress,next)=>Mutate(d=>{var c=d.Cards.First(c=>c.Id==id);if(!string.IsNullOrWhiteSpace(progress))c.Checkpoints.Add(new Checkpoint{At=DateTimeOffset.Now,Text=progress});c.NextAction=next;c.UpdatedAt=DateTimeOffset.Now;}));
         _progress=dialog;try{if(dialog.ShowDialog()==true){if(_strip!=null&&_document.Cards.FirstOrDefault(c=>c.Id==id) is {} updated)_strip.UpdateCard(updated);Notice("这一小步记下来了，续做条也已更新。");}}finally{_progress=null;if(_queuedResources.Count>0){var queued=_queuedResources.ToArray();_queuedResources.Clear();Dispatcher.BeginInvoke(new Action(()=>Capture(queued,true)));}}
     }
     private void Complete(string id)

@@ -33,6 +33,6 @@ public sealed class App : System.Windows.Application
         try{_vaultLock=new FileStream(Path.Combine(vault,".relay.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);}
         catch(IOException){throw new InvalidOperationException("这个数据目录已被另一个续页进程占用（可能使用了不同路径别名）。请回到已有窗口，不要同时打开同一仓库。");}
         window=new MainWindow(vault);MainWindow=window;window.InitializeSystem();
-        if(!forwarded.Contains("--capture")&&!forwarded.Contains("--resource"))window.Show();window.HandleArguments(forwarded);
+        if(!forwarded.Contains("--capture")&&!forwarded.Contains("--resource")&&!forwarded.Contains("--resume"))window.Show();window.HandleArguments(forwarded);
     }
 }

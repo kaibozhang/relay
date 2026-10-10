@@ -44,7 +44,7 @@ function Assert-NotRunning {
     }
 }
 function Test-Excluded([string]$Relative) {
-    return $Relative -match '(?i)(^|/)(Data|[.]git|tests?|artifacts|diagnostics?|node_modules|localStorage)(/|$)' -or
+    return $Relative -match '(?i)(^|/)(Data|drafts|[.]git|tests?|artifacts|diagnostics?|node_modules|localStorage)(/|$)' -or
         $Relative -match '(?i)([.]pdb|[.]log|[.]dmp|[.]etl|[.]png|[.]jpe?g|[.]html?|[.]m?js|[.]css|[.]map)$' -or
         $Relative -match '(?i)(^|/)(createdump[.]exe|vault[.]json.*|focus[.]json.*|[.]relay[.]lock|.*(?:testhost|WebView2|msedge|chromium|playwright).*)$'
 }

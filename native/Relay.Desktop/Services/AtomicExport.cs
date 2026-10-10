@@ -14,6 +14,8 @@ public static class AtomicExport
         // Reserve backing-data basenames everywhere, including short-path and subst aliases.
         {
             var name=Path.GetFileName(full);
+            if(Guid.TryParseExact(Path.GetFileNameWithoutExtension(name),"N",out _)&&name.EndsWith(".json",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("不能导出为草稿标识文件名，请选择普通名称。");
+            if(full.StartsWith(Path.Combine(vault,"drafts")+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("不能导出到草稿目录，请选择其他位置。");
             if(name.Contains('~'))throw new InvalidOperationException("导出文件名不能使用带 ~ 的短路径别名，请选择明确的新文件名。");
             if(name.Equals(".relay.lock",StringComparison.OrdinalIgnoreCase)||name.Equals("vault.json",StringComparison.OrdinalIgnoreCase)||name.StartsWith("vault.json.",StringComparison.OrdinalIgnoreCase)||name.Equals("focus.json",StringComparison.OrdinalIgnoreCase)||name.StartsWith("focus.json.",StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("不能用导出覆盖续页的数据、备份或恢复证据文件。请选择其他文件名或目录。");
         }

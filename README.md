@@ -10,7 +10,15 @@
 
 便携包里的标记启用 **Data 随程序目录保存**；更新程序时保留 Data。没有便携标记时默认保存到当前用户本地应用数据目录。不是浏览器缓存。
 
-发布包与原始测试证据分别记录构建哈希；实际完成结果和未验证项见 [原生验证报告](<docs/Relay-Verification.md>)。
+发布包与原始测试证据分别记录构建哈希；实际完成结果和未验证项见 [2.1原生验证报告](<docs/Relay-2.1-Verification.md>)。
+
+## 2.1 新增
+
+- 全局继续直接回到续做条，不强制打开管理页。
+- 更新下一步时进展选填，不生成空日志。
+- 新卡捕捉支持明确可关闭的本地草稿暂存、收起与崩溃恢复。
+
+[2.1 使用边界与兼容说明](<docs/Relay-2.1.md>)。
 
 ## 为什么还要留一个新工具
 
@@ -50,7 +58,7 @@
 ## 使用与证据
 
 - [中文快速指南](<docs/Relay-Windows-Guide.md>)
-- [原生验证报告](<docs/Relay-Verification.md>)
+- [2.1原生验证报告](<docs/Relay-2.1-Verification.md>)
 - [数据与隐私边界](<docs/Relay-Privacy.md>) · [已知限制](<docs/Relay-Known-Limits.md>)
 - [性能修复实测](<docs/Relay-Performance.md>) · [两小时工作记录](<docs/Relay-Worklog.md>)
 - [发布检查清单](<docs/RELEASE-CHECKLIST.md>)
