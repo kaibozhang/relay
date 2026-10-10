@@ -1,4 +1,4 @@
-# Relay 2.1 验证记录（发布前）
+# Relay 2.1 验证记录
 
 日期：2026-10-10。主仓库格式不变，测试均使用独立合成数据，不读取用户Data。
 
@@ -11,7 +11,14 @@
 
 [27项Debug原始报告](<../artifacts/native-tests/20261010-054806-a77b6d47/report.json>)
 
-正式Release全量UI和包校验将于发布前记录。上版84分钟耐久未重跑，不算2.1新功能证据。
+正式Release：27/27原生UI场景通过（91.7秒）；包完整性/独立运行时验证通过，便携CLI流程7/7通过，更新覆盖不改Data测试通过。
+
+- [Release 27项UI报告](<../artifacts/native-tests/20261010-055645-f45d68c1/report.json>)
+- [最终包验证](<../artifacts/release-test/20261010-135817-c24a9fb99d45478eb8a0c5b06ac42f46/report.json>)
+- [便携流程](<../artifacts/package-tests/4b2145ce7c7b440b83348e4bd4dfc9ae/report.json>)
+- [Data保留](<../artifacts/portable-update/714f830e609e40fd89b5d46c844d7f0d/report.json>)
+
+ZIP SHA256：`de0d5ec952f708f9f6ab308c8ad9c1bde96bd037aacf1de5d68a5c50ebaa5e59`。上版84分钟耐久未重跑，不算2.1新功能证据。
 
 ## 边界
 
